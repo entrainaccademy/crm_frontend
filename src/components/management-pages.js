@@ -100,7 +100,7 @@ export function LeaderboardPage({ people }) {
               label="Team leader"
               value={leader}
               onChange={setLeader}
-              options={["Rahul Menon", "Priya Nair", "Arjun Das"]}
+              options={[...new Set(people.map((p) => p.leader).filter(Boolean))]}
             />
           </div>
         </div>
@@ -283,19 +283,9 @@ export function TeamPage({ people = [], leads = [], calls = [], followups = [], 
     [selectedRole, setSelectedRole] = useState(""),
     [leader, setLeader] = useState(""),
     [status, setStatus] = useState("");
-  const members = [
-    ...people.map((p) => ({ ...p, role: p.role || "Sales Executive" })),
-    ...["Rahul Menon", "Priya Nair", "Arjun Das"].map((name, i) => ({
-      id: 20 + i,
-      name,
-      role: "Team Leader",
-      team: ["Team Alpha", "Team Bravo", "Team Charlie"][i],
-      leader: "Admin User",
-      target: null,
-      sales: null,
-      conversions: null,
-    })),
-  ];
+  const members = people.map((p) => ({ ...p, role: p.role || "Sales Executive" }));
+  const teamOptions = [...new Set(people.map((p) => p.team).filter(Boolean))];
+  const leaderOptions = [...new Set(people.map((p) => p.leader || p.manager).filter(Boolean))];
   return (
     <section className="card">
       <div className="table-toolbar">
@@ -309,19 +299,19 @@ export function TeamPage({ people = [], leads = [], calls = [], followups = [], 
             label="Role"
             value={selectedRole}
             onChange={setSelectedRole}
-            options={["Sales Executive", "Team Leader"]}
+            options={["Sales Executive", "Team Leader", "Manager", "HR", "Super Admin"]}
           />
           <FilterDropdown
             label="Team"
             value={team}
             onChange={setTeam}
-            options={["Team Alpha", "Team Bravo", "Team Charlie"]}
+            options={teamOptions.length ? teamOptions : ["Team Alpha", "Team Bravo", "Team Charlie"]}
           />
           <FilterDropdown
             label="Manager / leader"
             value={leader}
             onChange={setLeader}
-            options={["Admin User", "Rahul Menon", "Priya Nair", "Arjun Das"]}
+            options={leaderOptions}
           />
           <FilterDropdown
             label="Status"

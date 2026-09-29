@@ -151,17 +151,8 @@ export default function CRMApp() {
     [followups, setFollowups] = useState([]),
     [callsState, setCallsState] = useState([]),
     [tasks, setTasks] = useState([]),
-    [people, setPeople] = useState(executives),
-    [users, setUsers] = useState(
-      executives.map((p) => ({
-        ...p,
-        role: "Sales Executive",
-        email: p.short.toLowerCase() + "@entrain.in",
-        phone: "+91 98470 12345",
-        manager: p.leader,
-        status: "Active",
-      })),
-    ),
+    [people, setPeople] = useState([]),
+    [users, setUsers] = useState([]),
     [collapsed, setCollapsed] = useState(false),
     [drawer, setDrawer] = useState(false),
     [dropdown, setDropdown] = useState(""),
@@ -1139,12 +1130,12 @@ export default function CRMApp() {
                       "Team Bravo",
                       "Team Charlie",
                     ])}
-                    {field("Manager", "manager", "text", [
-                      "Shamil Ahmed",
-                      "Rahul Menon",
-                      "Priya Nair",
-                      "Arjun Das",
-                    ])}
+                    {field(
+                      "Manager",
+                      "manager",
+                      "text",
+                      [...new Set(users.filter((u) => ["Manager", "Team Leader", "Super Admin"].includes(u.role)).map((u) => u.name))],
+                    )}
                   </>
                 )}
               </div>
