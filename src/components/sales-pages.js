@@ -29,13 +29,12 @@ import {
   EmptyState,
 } from "./ui";
 import { statuses, sources, calls, money } from "@/lib/data";
-export function LeadsPage({ leads, navigate, openModal, exportData }) {
+export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = false }) {
   const [search, setSearch] = useState(""),
     [filters, setFilters] = useState(false),
     [status, setStatus] = useState(""),
     [source, setSource] = useState(""),
     [assigned, setAssigned] = useState(""),
-    [team, setTeam] = useState(""),
     [priority, setPriority] = useState(""),
     [service, setService] = useState(""),
     [date, setDate] = useState(""),
@@ -46,7 +45,6 @@ export function LeadsPage({ leads, navigate, openModal, exportData }) {
       (!status || l.status === status) &&
       (!source || l.source === source) &&
       (!assigned || l.assigned === assigned) &&
-      (!team || l.team === team) &&
       (!priority || l.priority === priority) &&
       (!service || l.service === service) &&
       (!date || l.created === date),
@@ -81,7 +79,6 @@ export function LeadsPage({ leads, navigate, openModal, exportData }) {
               [...new Set(leads.map((l) => l.assigned))],
               "Salesperson",
             ],
-            [team, setTeam, [...new Set(leads.map((l) => l.team))], "Team"],
             [source, setSource, sources, "Source"],
             [priority, setPriority, ["High", "Medium", "Low"], "Priority"],
             [
@@ -151,7 +148,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData }) {
           },
           { key: "date", label: "Next follow-up" },
           { key: "created", label: "Created date" },
-          {
+          !readOnly && {
             key: "actions",
             label: "",
             render: (r) => (
@@ -167,7 +164,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData }) {
               </button>
             ),
           },
-        ]}
+        ].filter(Boolean)}
       />
       <div className="pagination">
         <span>
@@ -197,7 +194,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData }) {
     </section>
   );
 }
-export function LeadDetails({ lead, openModal, notify, updateLead, navigate }) {
+export function LeadDetails({ lead, openModal, notify, updateLead, navigate, readOnly = false }) {
   const [note, setNote] = useState("");
   if (!lead) return <EmptyState title="Lead not found" />;
   const info = (title, fields) => (
@@ -230,7 +227,7 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate }) {
           </p>
         </div>
         <StatusBadge status={lead.status} />
-        <div className="toolbar-right">
+        {!readOnly && <div className="toolbar-right">
           <button
             onClick={() =>
               notify(
@@ -256,7 +253,7 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate }) {
           >
             <Plus size={15} /> Follow-up
           </button>
-        </div>
+        </div>}
       </section>
       <div className="details-grid">
         <div>
@@ -299,7 +296,7 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate }) {
                 <small>Just now · You</small>
               </div>
             ))}
-            <form
+            {!readOnly && <form
               onSubmit={(e) => {
                 e.preventDefault();
                 if (note.trim()) {
@@ -325,7 +322,7 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate }) {
               <button className="primary" type="submit">
                 Add note
               </button>
-            </form>
+            </form>}
           </section>
         </div>
         <section className="card detail-card">
@@ -342,6 +339,7 @@ export function FollowupsPage({
   openModal,
   navigate,
   notify,
+  readOnly = false,
 }) {
   const [tab, setTab] = useState("Today");
   const todayStr = new Date().toISOString().split("T")[0];
@@ -404,7 +402,7 @@ export function FollowupsPage({
                 <button onClick={() => navigate("leads/" + r.leadId)}>
                   View
                 </button>
-                <button
+                {!readOnly && <button
                   aria-label="Call customer"
                   onClick={() =>
                     notify(
@@ -413,8 +411,8 @@ export function FollowupsPage({
                   }
                 >
                   <Phone size={14} />
-                </button>
-                {!r.completed && (
+                </button>}
+                {!readOnly && !r.completed && (
                   <>
                     <button
                       onClick={() =>
@@ -452,11 +450,11 @@ const pipelineStageColors = {
   Lost: "#b28282",
 };
 
-export function LeadCard({ lead, navigate, onMove, onDragComplete }) {
+export function LeadCard({ lead, navigate, onMove, onDragComplete, readOnly = false }) {
   return (
     <article
       className="kanban-card"
-      draggable
+      draggable={!readOnly}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", String(lead.id));
@@ -501,6 +499,7 @@ export function LeadCard({ lead, navigate, onMove, onDragComplete }) {
         <select
           aria-label={"Move " + lead.name + " to stage"}
           value={lead.status}
+          disabled={readOnly}
           onChange={(e) => onMove(lead, e.target.value)}
         >
           {statuses.map((stage) => (
@@ -512,7 +511,7 @@ export function LeadCard({ lead, navigate, onMove, onDragComplete }) {
   );
 }
 
-export function PipelinePage({ leads, navigate, updateLead }) {
+export function PipelinePage({ leads, navigate, updateLead, readOnly = false }) {
   const [search, setSearch] = useState(""),
     [owner, setOwner] = useState(""),
     [course, setCourse] = useState(""),
@@ -526,6 +525,7 @@ export function PipelinePage({ leads, navigate, updateLead }) {
       (!course || lead.service === course),
   );
   const moveLead = (lead, status) => {
+    if (readOnly) return;
     if (lead.status === status) return;
     updateLead({
       ...lead,
@@ -601,7 +601,7 @@ export function PipelinePage({ leads, navigate, updateLead }) {
                   (item) =>
                     item.id === Number(e.dataTransfer.getData("text/plain")),
                 );
-                if (lead) moveLead(lead, status);
+                if (lead && !readOnly) moveLead(lead, status);
               }}
             >
               <div className="kanban-column-header">
@@ -628,6 +628,7 @@ export function PipelinePage({ leads, navigate, updateLead }) {
                       lead={lead}
                       navigate={navigate}
                       onMove={moveLead}
+                      readOnly={readOnly}
                       onDragComplete={() => setDragOver("")}
                     />
                   ))
@@ -642,7 +643,7 @@ export function PipelinePage({ leads, navigate, updateLead }) {
     </section>
   );
 }
-export function CallsPage({ calls = [], allowedNames, notify }) {
+export function CallsPage({ calls = [], allowedNames, notify, readOnly = false }) {
   const [search, setSearch] = useState("");
   const rows = (calls || []).filter(
     (c) =>
@@ -710,7 +711,7 @@ export function CallsPage({ calls = [], allowedNames, notify }) {
                 </button>
               ),
             },
-            {
+            !readOnly && {
               key: "action",
               label: "Action",
               render: (r) => (
@@ -724,7 +725,7 @@ export function CallsPage({ calls = [], allowedNames, notify }) {
                 </button>
               ),
             },
-          ]}
+          ].filter(Boolean)}
         />
       </section>
     </>

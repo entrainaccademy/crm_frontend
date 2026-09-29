@@ -176,7 +176,7 @@ export function Leaderboard({ people = [], navigate }) {
         <span className="tiny-tag">THIS MONTH</span>
       </div>
       <p className="section-subtitle">
-        Performance and goal tracking for sales team members.
+        Performance and goal tracking for sales executives.
       </p>
       {ranked.length === 0 ? (
         <div className="empty-inline">No executive records found.</div>
@@ -196,11 +196,13 @@ export default function Dashboard({
   role,
   leads = [],
   people = [],
+  staff = [],
   followups = [],
   calls = [],
   navigate,
   openModal,
   period = "This Month",
+  readOnly = false,
 }) {
   const todayStr = new Date().toISOString().split("T")[0];
 
@@ -230,17 +232,17 @@ export default function Dashboard({
       <>
         <div className="stats-grid four">
           {[
-            ["Team members", people.length],
-            ["Active employees", people.length],
+            ["Staff members", staff.length],
+            ["Active employees", staff.filter((person) => person.status === "Active").length],
             ["Open tasks", 0],
-            ["Team leaders", 3],
+            ["Sales executives", people.length],
           ].map(([label, value]) => (
             <StatCard
               key={label}
               label={label}
               value={value}
               icon={Users}
-              change="Active team"
+              change="Active staff"
               showComparison={false}
             />
           ))}
@@ -251,15 +253,15 @@ export default function Dashboard({
               <div>
                 <h2>Your people, at a glance</h2>
                 <p className="section-subtitle">
-                  Employee information and team performance.
+                  Employee information and sales performance.
                 </p>
               </div>
-              <button onClick={() => navigate("team")}>
-                View team <ArrowRight size={14} />
+              <button onClick={() => navigate("staff")}>
+                View staff <ArrowRight size={14} />
               </button>
             </div>
             <DataTable
-              rows={people.slice(0, 6)}
+              rows={staff.slice(0, 6)}
               columns={[
                 {
                   key: "name",
@@ -271,12 +273,11 @@ export default function Dashboard({
                     </div>
                   ),
                 },
-                { key: "team", label: "Team" },
-                { key: "conversions", label: "Conversions", render: (r) => r.conversions || 0 },
+                { key: "role", label: "Role" },
                 {
                   key: "status",
                   label: "Status",
-                  render: () => <StatusBadge status="Active" />,
+                  render: (r) => <StatusBadge status={r.status || "Active"} />,
                 },
               ]}
             />
@@ -428,7 +429,7 @@ export default function Dashboard({
                 ),
               },
               { key: "purpose", label: "PURPOSE" },
-              {
+              !readOnly && {
                 key: "action",
                 label: "",
                 render: (r) => (
@@ -440,7 +441,7 @@ export default function Dashboard({
                   </button>
                 ),
               },
-            ]}
+            ].filter(Boolean)}
             rows={todayFollowupRows}
           />
         </section>

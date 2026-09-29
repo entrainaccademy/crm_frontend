@@ -3,7 +3,7 @@ export const roles = [
   "Manager",
   "HR",
   "Data Analytics Manager",
-  "Team Leader",
+  "Team Lead",
   "Sales Executive",
 ];
 
@@ -20,7 +20,72 @@ export const shortMoney = (n) => {
   return "₹" + num.toLocaleString("en-IN");
 };
 
-export const executives = [];
+export const executives = [
+  {
+    id: 1,
+    name: "Mohammed Ali",
+    short: "Mohammed",
+    target: 500000,
+    sales: 0,
+    conversions: 0,
+  },
+  {
+    id: 2,
+    name: "Niyas Ahmed",
+    short: "Niyas",
+    target: 500000,
+    sales: 0,
+    conversions: 0,
+  },
+  {
+    id: 3,
+    name: "Fasil Rahman",
+    short: "Fasil",
+    target: 500000,
+    sales: 0,
+    conversions: 0,
+  },
+  {
+    id: 4,
+    name: "Ameen Hassan",
+    short: "Ameen",
+    target: 500000,
+    sales: 0,
+    conversions: 0,
+  },
+  {
+    id: 5,
+    name: "Shamil Khan",
+    short: "Shamil",
+    target: 500000,
+    sales: 0,
+    conversions: 0,
+  },
+  {
+    id: 6,
+    name: "Anjali Nair",
+    short: "Anjali",
+    target: 400000,
+    sales: 0,
+    conversions: 0,
+  },
+  {
+    id: 7,
+    name: "Rohan Mehta",
+    short: "Rohan",
+    target: 400000,
+    sales: 0,
+    conversions: 0,
+  },
+  {
+    id: 8,
+    name: "Sneha Patel",
+    short: "Sneha",
+    target: 400000,
+    sales: 0,
+    conversions: 0,
+  },
+];
 
 export const rankExecutives = (people = []) =>
   [...people].sort((a, b) => {
@@ -99,7 +164,7 @@ export const access = {
     "targets",
     "customers",
     "calls",
-    "team",
+    "staff",
     "performance",
     "sales-reports",
     "lead-reports",
@@ -118,14 +183,14 @@ export const access = {
     "targets",
     "customers",
     "calls",
-    "team",
+    "staff",
     "performance",
     "sales-reports",
     "lead-reports",
     "call-reports",
     "follow-up-reports",
   ],
-  HR: ["dashboard", "team", "tasks", "performance", "leaderboard"],
+  HR: ["dashboard", "staff", "tasks", "performance", "leaderboard"],
   "Data Analytics Manager": [
     "dashboard",
     "performance",
@@ -135,15 +200,20 @@ export const access = {
     "call-reports",
     "follow-up-reports",
   ],
-  "Team Leader": [
+  "Team Lead": [
     "dashboard",
     "leads",
     "follow-ups",
     "pipeline",
+    "customers",
     "calls",
+    "staff",
     "leaderboard",
-    "team",
     "performance",
+    "sales-reports",
+    "lead-reports",
+    "call-reports",
+    "follow-up-reports",
   ],
   "Sales Executive": [
     "dashboard",
