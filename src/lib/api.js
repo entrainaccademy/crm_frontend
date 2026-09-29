@@ -2,14 +2,21 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 async function request(endpoint, options = {}) {
   try {
+    const { headers, ...rest } = options;
+    const token = typeof window !== "undefined" ? sessionStorage.getItem("entrain-token") : null;
     const res = await fetch(`${API_BASE}${endpoint}`, {
+      ...rest,
       headers: {
         "Content-Type": "application/json",
-        ...(options.headers || {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(headers || {}),
       },
-      ...options,
     });
     const json = await res.json();
+    if (res.status === 401 && endpoint !== "/auth/login") {
+      sessionStorage.removeItem("entrain-token");
+      window.dispatchEvent(new Event("entrain-session-expired"));
+    }
     return json;
   } catch (err) {
     console.warn(`API request to ${endpoint} failed:`, err.message);
@@ -18,6 +25,29 @@ async function request(endpoint, options = {}) {
 }
 
 export const api = {
+  async login(email, password) {
+    const res = await request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    if (!res.success) throw new Error(res.message || res.error || "Sign in failed");
+    sessionStorage.setItem("entrain-token", res.data.token);
+    return res.data;
+  },
+  async me() {
+    const res = await request("/auth/me");
+    return res.success ? res.data : null;
+  },
+  logout() {
+    sessionStorage.removeItem("entrain-token");
+  },
+  async createUser(data) {
+    const res = await request("/users", { method: "POST", body: JSON.stringify(data) });
+    if (!res.success) throw new Error(res.message || res.error || "Could not create user");
+    return res.data;
+  },
+  async updateUser(id, data) {
+    const res = await request(`/users/${id}`, { method: "PUT", body: JSON.stringify(data) });
+    if (!res.success) throw new Error(res.message || res.error || "Could not update user");
+    return res.data;
+  },
   // Leads
   async getLeads(params = {}) {
     const query = new URLSearchParams(params).toString();

@@ -142,7 +142,11 @@ export default function CRMApp() {
     path = usePathname();
   const page = path.split("/")[1] || "dashboard";
   const detailId = Number(path.split("/")[2]);
-  const [role, setRole] = useState("Super Admin"),
+  const [role, setRole] = useState("Sales Executive"),
+    [authUser, setAuthUser] = useState(null),
+    [showPassword, setShowPassword] = useState(false),
+    [authError, setAuthError] = useState(""),
+    [authBusy, setAuthBusy] = useState(false),
     [leads, setLeads] = useState([]),
     [followups, setFollowups] = useState([]),
     [callsState, setCallsState] = useState([]),
@@ -166,7 +170,6 @@ export default function CRMApp() {
     [modal, setModal] = useState(null),
     [toast, setToast] = useState(""),
     [read, setRead] = useState(false),
-    [loggedOut, setLoggedOut] = useState(false),
     [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     const handle = (e) => {
@@ -192,11 +195,21 @@ export default function CRMApp() {
     }
   }, [toast]);
   useEffect(() => {
-    // Clear legacy mock sessionStorage
-    try {
-      sessionStorage.removeItem("entrain-demo");
-    } catch {}
-
+    const expire = () => { setAuthUser(null); setHydrated(true); };
+    window.addEventListener("entrain-session-expired", expire);
+    return () => window.removeEventListener("entrain-session-expired", expire);
+  }, []);
+  useEffect(() => {
+    async function restoreSession() {
+      if (!sessionStorage.getItem("entrain-token")) { setHydrated(true); return; }
+      const user = await api.me();
+      if (user) { setAuthUser(user); setRole(user.role); }
+      setHydrated(true);
+    }
+    restoreSession();
+  }, []);
+  useEffect(() => {
+    if (!authUser) return;
     async function loadData() {
       try {
         const [leadsData, followupsData, callsData, tasksData, usersData] =
@@ -221,27 +234,26 @@ export default function CRMApp() {
           setTasks(tasksData);
         }
         if (usersData && Array.isArray(usersData) && usersData.length > 0) {
-          setUsers(
-            usersData.map((u) => ({
+          const mappedUsers = usersData.map((u) => ({
               ...u,
               id: u.id || u.customId || u._id,
               short: u.short || u.name?.split(" ")[0],
-            })),
-          );
+            }));
+          setUsers(mappedUsers);
+          setPeople(mappedUsers.filter((u) => u.role === "Sales Executive" && u.status === "Active"));
         }
       } catch (err) {
         console.warn("API load error:", err);
       }
-      setHydrated(true);
     }
     loadData();
-  }, []);
+  }, [authUser]);
 
   const scopedNames =
     role === "Sales Executive"
-      ? ["Ameen Hassan"]
+      ? [authUser?.name]
       : role === "Team Leader"
-        ? executives.filter((p) => p.team === "Team Alpha").map((p) => p.name)
+        ? people.filter((p) => p.team === authUser?.team).map((p) => p.name)
         : null;
   const scopedLeads = leads.filter(
     (l) => !scopedNames || scopedNames.includes(l.assigned),
@@ -252,19 +264,11 @@ export default function CRMApp() {
   const allowed =
     access[role].includes(page) ||
     (page === "leads" && detailId && role === "Sales Executive");
-  const userName =
-    role === "Sales Executive"
-      ? "Ameen Hassan"
-      : role === "Team Leader"
-        ? "Rahul Menon"
-        : role === "HR"
-          ? "Priya Nair"
-          : "Admin User";
+  const userName = authUser?.name || "User";
   const updateLead = async (lead) => {
-    setLeads((prev) => prev.map((l) => (l.id === lead.id ? lead : l)));
-    try {
-      await api.updateLead(lead.id, lead);
-    } catch {}
+    const saved = await api.updateLead(lead.id, lead);
+    if (!saved) { notify("Could not save lead. Please try again."); return; }
+    setLeads((prev) => prev.map((l) => (l.id === lead.id ? normalizeLead(saved) : l)));
   };
   function exportData(rows, name, format = "csv") {
     if (!rows.length) {
@@ -349,7 +353,7 @@ export default function CRMApp() {
         date: modal.record?.date || todayStr,
         time: "10:30",
         notes:
-          modal.record?.notes || (data.initialNote ? [data.initialNote] : []),
+          modal.record?.notes || (data.initialNote ? [{ text: data.initialNote, author: userName }] : []),
         activities: modal.record?.activities || [
           { text: "Lead created for " + data.service, time: "Just now" },
           { text: "Assigned to " + data.assigned, time: "Just now" },
@@ -364,17 +368,13 @@ export default function CRMApp() {
         ],
       };
       if (modal.record) {
-        setLeads(leads.map((l) => (l.id === lead.id ? lead : l)));
-        api.updateLead(lead.id, lead);
+        const saved = await api.updateLead(lead.id, lead);
+        if (!saved) { notify("Could not save lead. Please try again."); return; }
+        setLeads(leads.map((l) => (l.id === lead.id ? normalizeLead(saved) : l)));
       } else {
-        setLeads([lead, ...leads]);
-        api.createLead(lead).then((saved) => {
-          if (saved) {
-            setLeads((prev) =>
-              prev.map((l) => (l.id === lead.id ? normalizeLead(saved) : l)),
-            );
-          }
-        });
+        const saved = await api.createLead(lead);
+        if (!saved) { notify("Could not add lead. Please try again."); return; }
+        setLeads([normalizeLead(saved), ...leads]);
       }
       notify(modal.record ? "Lead updated" : "Lead added successfully");
     }
@@ -389,20 +389,16 @@ export default function CRMApp() {
         purpose: data.notes || "Follow up with customer",
       };
       if (modal.record) {
-        setFollowups(followups.map((x) => (x.id === f.id ? f : x)));
-        api.updateFollowup(f.id, f);
+        const saved = await api.updateFollowup(f.id, f);
+        if (!saved) { notify("Could not save follow-up. Please try again."); return; }
+        setFollowups(followups.map((x) => (x.id === f.id ? normalizeLead(saved) : x)));
       } else {
-        setFollowups([f, ...followups]);
-        api.createFollowup(f).then((saved) => {
-          if (saved) {
-            setFollowups((prev) =>
-              prev.map((x) => (x.id === f.id ? normalizeLead(saved) : x)),
-            );
-          }
-        });
+        const saved = await api.createFollowup(f);
+        if (!saved) { notify("Could not add follow-up. Please try again."); return; }
+        setFollowups([normalizeLead(saved), ...followups]);
       }
       if (lead.id) {
-        updateLead({
+        await updateLead({
           ...lead,
           date: data.date,
           time: data.time,
@@ -424,12 +420,18 @@ export default function CRMApp() {
         id: modal.record?.id || Date.now(),
         status: modal.record?.status || "Active",
       };
-      setUsers(
-        modal.record
-          ? users.map((x) => (x.id === u.id ? u : x))
-          : [u, ...users],
-      );
-      notify("User saved");
+      try {
+        const saved = modal.record
+          ? await api.updateUser(modal.record.id, u)
+          : await api.createUser(u);
+        setUsers(modal.record
+          ? users.map((x) => (x.id === u.id ? saved : x))
+          : [saved, ...users]);
+        notify("User saved");
+      } catch (error) {
+        notify(error.message);
+        return;
+      }
     }
     setModal(null);
   }
@@ -457,34 +459,54 @@ export default function CRMApp() {
       )}
     </label>
   );
-  if (loggedOut)
+  if (!hydrated) return <div className="auth-loading" role="status">Loading workspace…</div>;
+  if (!authUser)
     return (
-      <div className="login-screen">
-        <div className="card detail-card">
-          <div className="brand dark-brand">
-            <img
-              className="brand-logo"
-              src="/images/entrain-logo.png"
-              alt="ENTRAIN Academy"
-            />
-            <small>CRM</small>
-          </div>
-          <h1>Welcome back</h1>
-          <p>Select a role to explore the frontend demo.</p>
-          <select value={role} onChange={(e) => setRole(e.target.value)}>
-            {roles.map((r) => (
-              <option key={r}>{r}</option>
-            ))}
-          </select>
-          <button
-            className="primary"
-            onClick={() => {
-              setLoggedOut(false);
-              navigate("dashboard");
-            }}
-          >
-            Enter workspace <ArrowUpRight size={15} />
-          </button>
+      <div className="auth-screen">
+        <div className="auth-shell">
+          <aside className="auth-story">
+            <div className="auth-story-brand"><span className="auth-story-mark">E</span><span>ENTRAIN <strong>CRM</strong></span></div>
+            <div className="auth-story-copy">
+              <span className="auth-eyebrow">YOUR SALES WORKSPACE</span>
+              <h1>Make every conversation count.</h1>
+              <p>Keep leads, follow-ups and your team&apos;s progress together in one clear workspace.</p>
+              <div className="auth-story-points">
+                <span><Users size={18} /> Know every opportunity</span>
+                <span><CalendarClock size={18} /> Stay ahead of follow-ups</span>
+                <span><ChartNoAxesCombined size={18} /> See your progress clearly</span>
+              </div>
+            </div>
+            <span className="auth-story-footer">ENTRAIN ACADEMY · SALES WORKSPACE</span>
+          </aside>
+          <section className="auth-panel" aria-label="Account access">
+            <div className="auth-panel-inner">
+              <div className="auth-logo"><img src="/images/entrain-logo.png" alt="ENTRAIN Academy" /><span>CRM</span></div>
+              <form className="auth-form" onSubmit={async (e) => {
+                e.preventDefault();
+                setAuthError("");
+                const values = Object.fromEntries(new FormData(e.currentTarget));
+                setAuthBusy(true);
+                try {
+                  const user = await api.login(values.email, values.password);
+                  setAuthUser(user);
+                  setRole(user.role);
+                  navigate("dashboard");
+                } catch (error) { setAuthError(error.message); }
+                finally { setAuthBusy(false); }
+              }}>
+                <div className="auth-form-intro">
+                  <span className="auth-eyebrow">WELCOME BACK</span>
+                  <h2>Sign in to your workspace</h2>
+                  <p>Enter the credentials provided by your administrator.</p>
+                </div>
+                <label>Email address<input name="email" type="email" autoComplete="email" placeholder="you@example.com" required /></label>
+                <label>Password<div className="auth-password"><input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter your password" required /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? "Hide" : "Show"}</button></div></label>
+                {authError && <div className="auth-error" role="alert">{authError}</div>}
+                <button className="primary auth-submit" type="submit" disabled={authBusy}>{authBusy ? "Signing in…" : "Sign in"}<ArrowUpRight size={17} /></button>
+                <p className="auth-help">Need an account? Ask your workspace administrator.</p>
+              </form>
+            </div>
+          </section>
         </div>
       </div>
     );
@@ -632,21 +654,7 @@ export default function CRMApp() {
         {dropdown === "profile" && (
           <div className="nav-dropdown profile-dropdown">
             <strong>{userName}</strong>
-            <small>Frontend development workspace</small>
-            <label>
-              Switch role
-              <select
-                value={role}
-                onChange={(e) => {
-                  setRole(e.target.value);
-                  navigate("dashboard");
-                }}
-              >
-                {roles.map((r) => (
-                  <option key={r}>{r}</option>
-                ))}
-              </select>
-            </label>
+            <small>{authUser.email}</small>
             <button
               onClick={() => {
                 setModal({ type: "profile" });
@@ -866,10 +874,7 @@ export default function CRMApp() {
                     page === "my-leads"
                       ? scopedLeads.filter(
                           (l) =>
-                            l.assigned ===
-                            (role === "Sales Executive"
-                              ? "Ameen Hassan"
-                              : "Mohammed Ali"),
+                            l.assigned === userName,
                         )
                       : scopedLeads
                   }
@@ -979,7 +984,8 @@ export default function CRMApp() {
           onClose={() => setModal(null)}
         >
           {["lead", "followup", "user"].includes(modal.type) ? (
-            <form onSubmit={saveForm}>
+            <form className={modal.type === "user" ? "account-form" : undefined} onSubmit={saveForm}>
+              {modal.type === "user" && <div className="account-form-intro"><strong>{modal.record ? "Update account" : "Create a team account"}</strong><span>{modal.record ? "Edit the user’s details, role and access." : "Choose a role and temporary password. Share the sign-in details with the team member."}</span></div>}
               <div className="form-grid">
                 {modal.type === "lead" && (
                   <>
@@ -1125,6 +1131,7 @@ export default function CRMApp() {
                   <>
                     {field("Name", "name")}
                     {field("Email", "email", "email")}
+                    <label>{modal.record ? "New password (optional)" : "Temporary password"}<input name="password" type="password" minLength="8" required={!modal.record} autoComplete="new-password" /></label>
                     {field("Phone", "phone", "tel")}
                     {field("Role", "role", "text", roles)}
                     {field("Team", "team", "text", [
@@ -1149,7 +1156,7 @@ export default function CRMApp() {
                   {modal.type === "followup"
                     ? "Save follow-up"
                     : modal.type === "user"
-                      ? "Save user"
+                      ? modal.record ? "Save changes" : "Create user"
                       : "Save lead"}
                   <Check size={15} />
                 </button>
@@ -1186,7 +1193,10 @@ export default function CRMApp() {
           onClose={() => setModal(null)}
           onConfirm={() => {
             setModal(null);
-            setLoggedOut(true);
+            api.logout();
+            setAuthUser(null);
+            setLeads([]);
+            setFollowups([]);
           }}
         />
       )}

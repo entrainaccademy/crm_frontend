@@ -295,7 +295,7 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate }) {
             <h2>Notes</h2>
             {lead.notes.map((n, i) => (
               <div className="note" key={i}>
-                {n}
+                {typeof n === "string" ? n : n.text}
                 <small>Just now · You</small>
               </div>
             ))}
@@ -305,7 +305,7 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate }) {
                 if (note.trim()) {
                   updateLead({
                     ...lead,
-                    notes: [...lead.notes, note],
+                    notes: [...lead.notes, { text: note, author: "User" }],
                     activities: [
                       ...lead.activities,
                       { text: "Note added: " + note, time: "Just now" },
