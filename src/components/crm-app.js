@@ -52,7 +52,7 @@ import {
 import {
   LeaderboardPage,
   TargetsPage,
-  TeamPage,
+  StaffPage,
   AnalyticsPage,
   UsersPage,
   SettingsPage,
@@ -94,9 +94,9 @@ const navGroups = [
     ],
   ],
   [
-    "TEAM",
+    "PEOPLE",
     [
-      ["team", "Team Members", Users],
+      ["staff", "Staff", Users],
       ["performance", "Performance", ChartNoAxesCombined],
       ["tasks", "Tasks", BriefcaseBusiness],
     ],
@@ -132,10 +132,10 @@ const descriptions = {
   targets: "Clear goals. Measurable progress. Shared success.",
   customers: "Build lasting relationships with every customer.",
   calls: "Every conversation brings you closer.",
-  team: "The people behind your progress.",
+  staff: "The people behind your progress.",
   performance: "Understand what’s working. Find your next opportunity.",
   users: "Manage your people and their workspace access.",
-  settings: "Make ENTRAIN CRM work for your team.",
+  settings: "Make ENTRAIN CRM work for your organization.",
 };
 export default function CRMApp() {
   const router = useRouter(),
@@ -158,7 +158,6 @@ export default function CRMApp() {
         role: "Sales Executive",
         email: p.short.toLowerCase() + "@entrain.in",
         phone: "+91 98470 12345",
-        manager: p.leader,
         status: "Active",
       })),
     ),
@@ -249,12 +248,8 @@ export default function CRMApp() {
     loadData();
   }, [authUser]);
 
-  const scopedNames =
-    role === "Sales Executive"
-      ? [authUser?.name]
-      : role === "Team Leader"
-        ? people.filter((p) => p.team === authUser?.team).map((p) => p.name)
-        : null;
+  const scopedNames = role === "Sales Executive" ? [authUser?.name] : null;
+  const readOnly = role === "Team Lead";
   const scopedLeads = leads.filter(
     (l) => !scopedNames || scopedNames.includes(l.assigned),
   );
@@ -341,14 +336,12 @@ export default function CRMApp() {
         notify("Advance amount must be between ₹0 and the sale amount");
         return;
       }
-      const assigned = people.find((p) => p.name === data.assigned);
       const lead = {
         ...modal.record,
         ...data,
         saleAmount,
         advanceAmount,
         id: modal.record?.id || Date.now(),
-        team: assigned?.team || "Team Alpha",
         created: modal.record?.created || todayStr,
         date: modal.record?.date || todayStr,
         time: "10:30",
@@ -469,7 +462,7 @@ export default function CRMApp() {
             <div className="auth-story-copy">
               <span className="auth-eyebrow">YOUR SALES WORKSPACE</span>
               <h1>Make every conversation count.</h1>
-              <p>Keep leads, follow-ups and your team&apos;s progress together in one clear workspace.</p>
+              <p>Keep leads, follow-ups and sales progress together in one clear workspace.</p>
               <div className="auth-story-points">
                 <span><Users size={18} /> Know every opportunity</span>
                 <span><CalendarClock size={18} /> Stay ahead of follow-ups</span>
@@ -586,7 +579,7 @@ export default function CRMApp() {
                     <UserAvatar name={p.name} />
                     <span>
                       {p.name}
-                      <small>Team member · {p.team}</small>
+                      <small>Sales executive</small>
                     </span>
                   </button>
                 ))}
@@ -712,9 +705,7 @@ export default function CRMApp() {
                   >
                     <Icon size={17} />
                     <span>
-                      {id === "leads" && role === "Team Leader"
-                        ? "Team Leads"
-                        : id === "customers" && role === "Sales Executive"
+                      {id === "customers" && role === "Sales Executive"
                           ? "My Customers"
                           : label}
                     </span>
@@ -748,7 +739,7 @@ export default function CRMApp() {
       </aside>
       <main
         className={
-          ["follow-ups", "calls", "customers", "team", "users"].includes(page)
+          ["follow-ups", "calls", "customers", "staff", "users"].includes(page)
             ? "main table-page"
             : "main"
         }
@@ -798,7 +789,7 @@ export default function CRMApp() {
                       <CalendarClock size={15} /> Sep 1 – Sep 30, 2026{" "}
                       <ChevronDown size={13} />
                     </button>
-                    {access[role].includes("leads") && (
+                    {access[role].includes("leads") && !readOnly && (
                       <button
                         className="primary"
                         onClick={() => setModal({ type: "lead" })}
@@ -807,14 +798,14 @@ export default function CRMApp() {
                       </button>
                     )}
                   </>
-                ) : ["leads", "my-leads", "pipeline"].includes(page) ? (
+                ) : ["leads", "my-leads", "pipeline"].includes(page) && !readOnly ? (
                   <button
                     className="primary"
                     onClick={() => setModal({ type: "lead" })}
                   >
                     <Plus size={16} /> Add lead
                   </button>
-                ) : page === "follow-ups" ? (
+                ) : page === "follow-ups" && !readOnly ? (
                   <button
                     className="primary"
                     onClick={() => setModal({ type: "followup" })}
@@ -852,11 +843,13 @@ export default function CRMApp() {
                 role={role}
                 leads={scopedLeads}
                 people={people}
+                staff={users}
                 followups={scopedFollowups}
                 calls={callsState}
                 navigate={navigate}
                 openModal={setModal}
                 period={period}
+                readOnly={readOnly}
               />
             )}
             {["leads", "my-leads"].includes(page) &&
@@ -867,6 +860,7 @@ export default function CRMApp() {
                   notify={notify}
                   updateLead={updateLead}
                   navigate={navigate}
+                  readOnly={readOnly}
                 />
               ) : (
                 <LeadsPage
@@ -881,6 +875,7 @@ export default function CRMApp() {
                   navigate={navigate}
                   openModal={setModal}
                   exportData={exportData}
+                  readOnly={readOnly}
                 />
               ))}
             {page === "follow-ups" && (
@@ -897,6 +892,7 @@ export default function CRMApp() {
                 openModal={setModal}
                 navigate={navigate}
                 notify={notify}
+                readOnly={readOnly}
               />
             )}
             {page === "pipeline" && (
@@ -904,10 +900,11 @@ export default function CRMApp() {
                 leads={scopedLeads}
                 navigate={navigate}
                 updateLead={updateLead}
+                readOnly={readOnly}
               />
             )}
             {page === "calls" && (
-              <CallsPage calls={callsState} allowedNames={scopedNames} notify={notify} />
+              <CallsPage calls={callsState} allowedNames={scopedNames} notify={notify} readOnly={readOnly} />
             )}
             {page === "customers" && (
               <CustomersPage leads={scopedLeads} navigate={navigate} />
@@ -920,18 +917,13 @@ export default function CRMApp() {
                 notify={notify}
               />
             )}
-            {page === "team" && (
-              <TeamPage
-                people={
-                  scopedNames
-                    ? people.filter((p) => scopedNames.includes(p.name))
-                    : people
-                }
+            {page === "staff" && (
+              <StaffPage
+                people={users}
                 leads={scopedLeads}
                 calls={callsState}
                 followups={scopedFollowups}
                 openModal={setModal}
-                role={role}
               />
             )}
             {(page === "performance" || page.includes("reports")) && (
@@ -985,7 +977,7 @@ export default function CRMApp() {
         >
           {["lead", "followup", "user"].includes(modal.type) ? (
             <form className={modal.type === "user" ? "account-form" : undefined} onSubmit={saveForm}>
-              {modal.type === "user" && <div className="account-form-intro"><strong>{modal.record ? "Update account" : "Create a team account"}</strong><span>{modal.record ? "Edit the user’s details, role and access." : "Choose a role and temporary password. Share the sign-in details with the team member."}</span></div>}
+              {modal.type === "user" && <div className="account-form-intro"><strong>{modal.record ? "Update account" : "Create a user account"}</strong><span>{modal.record ? "Edit the user’s details, role and access." : "Choose a role and temporary password. Share the sign-in details with the user."}</span></div>}
               <div className="form-grid">
                 {modal.type === "lead" && (
                   <>
@@ -1041,7 +1033,7 @@ export default function CRMApp() {
                           )
                           .map((p) => (
                             <option key={p.id} value={p.name}>
-                              {p.name} · {p.team}
+                              {p.name}
                             </option>
                           ))}
                       </select>
@@ -1134,17 +1126,6 @@ export default function CRMApp() {
                     <label>{modal.record ? "New password (optional)" : "Temporary password"}<input name="password" type="password" minLength="8" required={!modal.record} autoComplete="new-password" /></label>
                     {field("Phone", "phone", "tel")}
                     {field("Role", "role", "text", roles)}
-                    {field("Team", "team", "text", [
-                      "Team Alpha",
-                      "Team Bravo",
-                      "Team Charlie",
-                    ])}
-                    {field("Manager", "manager", "text", [
-                      "Shamil Ahmed",
-                      "Rahul Menon",
-                      "Priya Nair",
-                      "Arjun Das",
-                    ])}
                   </>
                 )}
               </div>
@@ -1168,7 +1149,7 @@ export default function CRMApp() {
               <h2>{modal.record?.name || userName}</h2>
               <p>
                 {modal.record?.role || role} ·{" "}
-                {modal.record?.team || "Entrain workspace"}
+                Entrain workspace
               </p>
               <p>
                 {modal.record?.name?.toLowerCase().replace(" ", ".") ||

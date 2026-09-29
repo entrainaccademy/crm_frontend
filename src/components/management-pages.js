@@ -24,17 +24,11 @@ import {
 import { rankExecutives, money, roles, access } from "@/lib/data";
 import { SalesChart } from "./dashboard";
 export function LeaderboardPage({ people }) {
-  const [team, setTeam] = useState(""),
-    [leader, setLeader] = useState(""),
-    [period, setPeriod] = useState("This Month");
+  const [period, setPeriod] = useState("This Month");
   const multiplier =
     period === "Last Month" ? 0.92 : period === "This Quarter" ? 2.8 : 1;
   const ranked = rankExecutives(
-    people
-      .filter(
-        (p) => (!team || p.team === team) && (!leader || p.leader === leader),
-      )
-      .map((p) => ({
+    people.map((p) => ({
         ...p,
         sales: Math.round(p.sales * multiplier),
         target: period === "This Quarter" ? p.target * 3 : p.target,
@@ -90,18 +84,6 @@ export function LeaderboardPage({ people }) {
                 <input aria-label="End date" type="date" />
               </>
             )}
-            <FilterDropdown
-              label="All teams"
-              value={team}
-              onChange={setTeam}
-              options={["Team Alpha", "Team Bravo", "Team Charlie"]}
-            />
-            <FilterDropdown
-              label="Team leader"
-              value={leader}
-              onChange={setLeader}
-              options={["Rahul Menon", "Priya Nair", "Arjun Das"]}
-            />
           </div>
         </div>
         <DataTable
@@ -126,7 +108,6 @@ export function LeaderboardPage({ people }) {
                 </div>
               ),
             },
-            { key: "team", label: "Team" },
             { key: "target", label: "Target", render: (r) => money(r.target) },
             {
               key: "sales",
@@ -277,51 +258,25 @@ export function TargetsPage({ people, setPeople, notify }) {
     </div>
   );
 }
-export function TeamPage({ people = [], leads = [], calls = [], followups = [], openModal, role }) {
+export function StaffPage({ people = [], leads = [], calls = [], followups = [], openModal }) {
   const [search, setSearch] = useState(""),
-    [team, setTeam] = useState(""),
     [selectedRole, setSelectedRole] = useState(""),
-    [leader, setLeader] = useState(""),
     [status, setStatus] = useState("");
-  const members = [
-    ...people.map((p) => ({ ...p, role: p.role || "Sales Executive" })),
-    ...["Rahul Menon", "Priya Nair", "Arjun Das"].map((name, i) => ({
-      id: 20 + i,
-      name,
-      role: "Team Leader",
-      team: ["Team Alpha", "Team Bravo", "Team Charlie"][i],
-      leader: "Admin User",
-      target: null,
-      sales: null,
-      conversions: null,
-    })),
-  ];
+  const members = people.map((p) => ({ ...p, role: p.role || "Sales Executive" }));
   return (
     <section className="card">
       <div className="table-toolbar">
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search team members…"
+          placeholder="Search staff…"
         />
         <div className="filter-row">
           <FilterDropdown
             label="Role"
             value={selectedRole}
             onChange={setSelectedRole}
-            options={["Sales Executive", "Team Leader"]}
-          />
-          <FilterDropdown
-            label="Team"
-            value={team}
-            onChange={setTeam}
-            options={["Team Alpha", "Team Bravo", "Team Charlie"]}
-          />
-          <FilterDropdown
-            label="Manager / leader"
-            value={leader}
-            onChange={setLeader}
-            options={["Admin User", "Rahul Menon", "Priya Nair", "Arjun Das"]}
+            options={["Super Admin", "Sales Executive", "Manager", "HR", "Data Analytics Manager", "Team Lead"]}
           />
           <FilterDropdown
             label="Status"
@@ -335,16 +290,14 @@ export function TeamPage({ people = [], leads = [], calls = [], followups = [], 
         rows={members.filter(
           (p) =>
             p.name.toLowerCase().includes(search.toLowerCase()) &&
-            (!team || p.team === team) &&
             (!selectedRole || p.role === selectedRole) &&
-            (!leader || p.leader === leader) &&
-            status !== "Inactive",
+            (!status || p.status === status),
         )}
         onRow={(p) => openModal({ type: "employee", record: p })}
         columns={[
           {
             key: "name",
-            label: "Team member",
+            label: "Staff member",
             render: (r, i) => (
               <div className="person-cell">
                 <UserAvatar name={r.name} index={i} />
@@ -353,7 +306,6 @@ export function TeamPage({ people = [], leads = [], calls = [], followups = [], 
             ),
           },
           { key: "role", label: "Role" },
-          { key: "team", label: "Team" },
           {
             key: "leads",
             label: "Active leads",
@@ -411,7 +363,7 @@ export function TeamPage({ people = [], leads = [], calls = [], followups = [], 
           {
             key: "status",
             label: "Status",
-            render: () => <StatusBadge status="Active" />,
+            render: (r) => <StatusBadge status={r.status || "Active"} />,
           },
         ]}
       />
@@ -709,8 +661,6 @@ export function UsersPage({ users, setUsers, openModal }) {
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
             { key: "role", label: "Role" },
-            { key: "team", label: "Team" },
-            { key: "manager", label: "Manager" },
             {
               key: "status",
               label: "Status",
@@ -773,7 +723,6 @@ export function SettingsPage({ notify }) {
     "Lead Settings",
     "Lead Sources",
     "Lead Statuses",
-    "Teams",
     "Roles & Permissions",
     "Target Settings",
     "Call Settings",
@@ -844,7 +793,7 @@ export function SettingsPage({ notify }) {
                 "Follow-up reminders",
                 "New lead assignments",
                 "Target milestones",
-                "Team updates",
+                "Staff updates",
               ].map((t) => (
                 <label className="checkbox-label" key={t}>
                   <input type="checkbox" defaultChecked />
@@ -871,8 +820,6 @@ export function SettingsPage({ notify }) {
                         ? "Meta Ads, Instagram, Facebook, Website, WhatsApp, Referral, Walk-in, Other"
                         : section === "Lead Statuses"
                           ? "New, Contacted, Follow-up, Interested, Quotation, Won, Lost"
-                          : section === "Teams"
-                            ? "Team Alpha, Team Bravo, Team Charlie"
                             : section === "Target Settings"
                               ? "500000"
                               : "Default priority: Medium"
