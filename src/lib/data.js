@@ -143,9 +143,7 @@ export const courses = [
 export const courseFees = Object.fromEntries(
   courses.map((course) => [course.name, course.fee]),
 );
-<<<<<<< HEAD
 
-=======
 const legacyCourses = {
   "Digital Marketing": courses[0].name,
   "Web Development": courses[1].name,
@@ -158,9 +156,9 @@ const legacyCourses = {
   "Food Production & Kitchen Management": courses[4].name,
   "Barista & Beverage Arts": courses[5].name,
 };
->>>>>>> e25ca65141ddfc2f89cb1c4fa8fb5059e2a3d39b
+
 export const normalizeLead = (lead) => {
-  const service = lead.service || courses[0].name;
+  const service = legacyCourses[lead.service] || lead.service || courses[0].name;
   const saleAmount = Number(lead.saleAmount ?? courseFees[service] ?? 0);
   return {
     ...lead,
