@@ -132,18 +132,33 @@ export const sources = [
 ];
 
 export const courses = [
-  { name: "Professional Chef Diploma", fee: 180000 },
-  { name: "Bakery & Patisserie Diploma", fee: 150000 },
-  { name: "Culinary Arts Certificate", fee: 85000 },
-  { name: "Advanced Baking Certificate", fee: 65000 },
-  { name: "Food Production & Kitchen Management", fee: 120000 },
-  { name: "Barista & Beverage Arts", fee: 45000 },
+  { name: "Dessert Workshop", fee: 180000 },
+  { name: "One Day Shawarma and Shawai Course", fee: 150000 },
+  { name: "One Week Shawarma and Shawai Course", fee: 85000 },
+  { name: "One Day Fried Chicken Course", fee: 65000 },
+  { name: "One Week Fried Chicken Course", fee: 120000 },
+  { name: "One Week Arabian Cuisine Course", fee: 45000 },
 ];
 
 export const courseFees = Object.fromEntries(
   courses.map((course) => [course.name, course.fee]),
 );
+<<<<<<< HEAD
 
+=======
+const legacyCourses = {
+  "Digital Marketing": courses[0].name,
+  "Web Development": courses[1].name,
+  "Business Consulting": courses[2].name,
+  "Brand Strategy": courses[3].name,
+  "Professional Chef Diploma": courses[0].name,
+  "Bakery & Patisserie Diploma": courses[1].name,
+  "Culinary Arts Certificate": courses[2].name,
+  "Advanced Baking Certificate": courses[3].name,
+  "Food Production & Kitchen Management": courses[4].name,
+  "Barista & Beverage Arts": courses[5].name,
+};
+>>>>>>> e25ca65141ddfc2f89cb1c4fa8fb5059e2a3d39b
 export const normalizeLead = (lead) => {
   const service = lead.service || courses[0].name;
   const saleAmount = Number(lead.saleAmount ?? courseFees[service] ?? 0);
