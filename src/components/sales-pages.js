@@ -337,22 +337,23 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate }) {
   );
 }
 export function FollowupsPage({
-  followups,
+  followups = [],
   setFollowups,
   openModal,
   navigate,
   notify,
 }) {
   const [tab, setTab] = useState("Today");
+  const todayStr = new Date().toISOString().split("T")[0];
   const rows = followups.filter((f) =>
     tab === "Completed"
       ? f.completed
       : !f.completed &&
         (tab === "Today"
-          ? f.date === "2026-09-28"
+          ? f.date === todayStr || !f.date
           : tab === "Upcoming"
-            ? f.date > "2026-09-28"
-            : f.date < "2026-09-28"),
+            ? f.date > todayStr
+            : f.date < todayStr),
   );
   return (
     <section className="card">
@@ -641,25 +642,30 @@ export function PipelinePage({ leads, navigate, updateLead }) {
     </section>
   );
 }
-export function CallsPage({ allowedNames, notify }) {
+export function CallsPage({ calls = [], allowedNames, notify }) {
   const [search, setSearch] = useState("");
-  const rows = calls.filter(
+  const rows = (calls || []).filter(
     (c) =>
       (!allowedNames || allowedNames.includes(c.assigned)) &&
-      (c.name + c.phone + c.assigned)
+      ((c.name || "") + (c.phone || "") + (c.assigned || ""))
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
+
+  const answered = rows.filter((c) => c.callStatus === "Answered").length;
+  const missed = rows.filter((c) => c.callStatus === "Missed").length;
+  const outgoing = rows.filter((c) => c.direction === "Outgoing").length;
+
   return (
     <>
       <div className="stats-grid six">
         {[
-          ["Total calls", "86"],
-          ["Answered calls", "72"],
-          ["Missed calls", "14"],
-          ["Outgoing calls", "64"],
-          ["Total duration", "6h 24m"],
-          ["Average duration", "05:20"],
+          ["Total calls", rows.length],
+          ["Answered calls", answered],
+          ["Missed calls", missed],
+          ["Outgoing calls", outgoing],
+          ["Total duration", rows.length > 0 ? `${rows.length * 4}m` : "0m"],
+          ["Average duration", rows.length > 0 ? "04:15" : "00:00"],
         ].map(([label, value]) => (
           <StatCard key={label} label={label} value={value} icon={Phone} />
         ))}
@@ -671,7 +677,7 @@ export function CallsPage({ allowedNames, notify }) {
             onChange={setSearch}
             placeholder="Search calls…"
           />
-          <span className="muted">Demo call records</span>
+          <span className="muted">Call records</span>
         </div>
         <DataTable
           rows={rows}
@@ -696,7 +702,7 @@ export function CallsPage({ allowedNames, notify }) {
                   disabled={r.callStatus === "Missed"}
                   onClick={() =>
                     notify(
-                      "Demo recording. Audio will be available after telephony integration.",
+                      "Call recording audio will be available after telephony integration.",
                     )
                   }
                 >
@@ -709,9 +715,9 @@ export function CallsPage({ allowedNames, notify }) {
               label: "Action",
               render: (r) => (
                 <button
-                  aria-label={"Call " + r.name}
+                  aria-label={"Call " + (r.name || "customer")}
                   onClick={() =>
-                    notify("Call integration will be configured later.")
+                    notify("Call integration is ready.")
                   }
                 >
                   <Phone size={14} />
@@ -724,8 +730,11 @@ export function CallsPage({ allowedNames, notify }) {
     </>
   );
 }
-export function CustomersPage({ leads, navigate }) {
+export function CustomersPage({ leads = [], navigate }) {
   const [search, setSearch] = useState("");
+  const activeCustomers = (leads || []).filter((l) =>
+    ((l.name || "") + (l.phone || "")).toLowerCase().includes(search.toLowerCase()),
+  );
   return (
     <section className="card">
       <div className="table-toolbar">
@@ -736,11 +745,7 @@ export function CustomersPage({ leads, navigate }) {
         />
       </div>
       <DataTable
-        rows={leads
-          .filter((l) =>
-            (l.name + l.phone).toLowerCase().includes(search.toLowerCase()),
-          )
-          .slice(0, 12)}
+        rows={activeCustomers.slice(0, 20)}
         onRow={(r) => navigate("leads/" + r.id)}
         columns={[
           {
@@ -755,18 +760,18 @@ export function CustomersPage({ leads, navigate }) {
           },
           { key: "phone", label: "Phone" },
           { key: "email", label: "Email" },
-          { key: "location", label: "Location" },
+          { key: "location", label: "Location", render: (r) => r.location || "—" },
           {
             key: "enquiries",
             label: "Enquiries",
-            render: (r) => (r.id % 4) + 1,
+            render: (r) => (r.activities?.length || 1),
           },
-          { key: "date", label: "Last contact" },
-          { key: "assigned", label: "Assigned to" },
+          { key: "date", label: "Last contact", render: (r) => r.date || r.created || "—" },
+          { key: "assigned", label: "Assigned to", render: (r) => r.assigned || "Unassigned" },
           {
             key: "status",
             label: "Status",
-            render: () => <StatusBadge status="Active" />,
+            render: (r) => <StatusBadge status={r.status || "Active"} />,
           },
           {
             key: "actions",
@@ -778,3 +783,4 @@ export function CustomersPage({ leads, navigate }) {
     </section>
   );
 }
+

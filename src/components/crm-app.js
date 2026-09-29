@@ -72,6 +72,7 @@ import {
   courseFees,
   normalizeLead,
 } from "@/lib/data";
+import { api } from "@/lib/api";
 const navGroups = [
   ["", [["dashboard", "Dashboard", LayoutDashboard]]],
   [
@@ -142,8 +143,10 @@ export default function CRMApp() {
   const page = path.split("/")[1] || "dashboard";
   const detailId = Number(path.split("/")[2]);
   const [role, setRole] = useState("Super Admin"),
-    [leads, setLeads] = useState(initialLeads),
-    [followups, setFollowups] = useState(initialFollowups),
+    [leads, setLeads] = useState([]),
+    [followups, setFollowups] = useState([]),
+    [callsState, setCallsState] = useState([]),
+    [tasks, setTasks] = useState([]),
     [people, setPeople] = useState(executives),
     [users, setUsers] = useState(
       executives.map((p) => ({
@@ -189,24 +192,51 @@ export default function CRMApp() {
     }
   }, [toast]);
   useEffect(() => {
+    // Clear legacy mock sessionStorage
     try {
-      const saved = JSON.parse(sessionStorage.getItem("entrain-demo"));
-      if (saved) {
-        setLeads((saved.leads || initialLeads).map(normalizeLead));
-        setFollowups((saved.followups || initialFollowups).map(normalizeLead));
-        setPeople(saved.people || executives);
-        setRole(saved.role || "Super Admin");
-      }
+      sessionStorage.removeItem("entrain-demo");
     } catch {}
-    setHydrated(true);
+
+    async function loadData() {
+      try {
+        const [leadsData, followupsData, callsData, tasksData, usersData] =
+          await Promise.all([
+            api.getLeads(),
+            api.getFollowups(),
+            api.getCalls(),
+            api.getTasks(),
+            api.getUsers(),
+          ]);
+
+        if (leadsData && Array.isArray(leadsData)) {
+          setLeads(leadsData.map(normalizeLead));
+        }
+        if (followupsData && Array.isArray(followupsData)) {
+          setFollowups(followupsData.map(normalizeLead));
+        }
+        if (callsData && Array.isArray(callsData)) {
+          setCallsState(callsData);
+        }
+        if (tasksData && Array.isArray(tasksData)) {
+          setTasks(tasksData);
+        }
+        if (usersData && Array.isArray(usersData) && usersData.length > 0) {
+          setUsers(
+            usersData.map((u) => ({
+              ...u,
+              id: u.id || u.customId || u._id,
+              short: u.short || u.name?.split(" ")[0],
+            })),
+          );
+        }
+      } catch (err) {
+        console.warn("API load error:", err);
+      }
+      setHydrated(true);
+    }
+    loadData();
   }, []);
-  useEffect(() => {
-    if (!hydrated) return;
-    sessionStorage.setItem(
-      "entrain-demo",
-      JSON.stringify({ leads, followups, people, role }),
-    );
-  }, [leads, followups, people, role, hydrated]);
+
   const scopedNames =
     role === "Sales Executive"
       ? ["Ameen Hassan"]
@@ -229,9 +259,13 @@ export default function CRMApp() {
         ? "Rahul Menon"
         : role === "HR"
           ? "Priya Nair"
-          : "Shamil Ahmed";
-  const updateLead = (lead) =>
-    setLeads(leads.map((l) => (l.id === lead.id ? lead : l)));
+          : "Admin User";
+  const updateLead = async (lead) => {
+    setLeads((prev) => prev.map((l) => (l.id === lead.id ? lead : l)));
+    try {
+      await api.updateLead(lead.id, lead);
+    } catch {}
+  };
   function exportData(rows, name, format = "csv") {
     if (!rows.length) {
       notify("No records to export");
@@ -282,9 +316,10 @@ export default function CRMApp() {
     URL.revokeObjectURL(url);
     notify("Your export is ready");
   }
-  function saveForm(e) {
+  async function saveForm(e) {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget));
+    const todayStr = new Date().toISOString().split("T")[0];
     if (modal.type === "lead") {
       const saleAmount = Number(data.saleAmount),
         advanceAmount = Number(data.advanceAmount);
@@ -310,8 +345,8 @@ export default function CRMApp() {
         advanceAmount,
         id: modal.record?.id || Date.now(),
         team: assigned?.team || "Team Alpha",
-        created: modal.record?.created || "2026-09-28",
-        date: modal.record?.date || "2026-09-29",
+        created: modal.record?.created || todayStr,
+        date: modal.record?.date || todayStr,
         time: "10:30",
         notes:
           modal.record?.notes || (data.initialNote ? [data.initialNote] : []),
@@ -328,40 +363,58 @@ export default function CRMApp() {
             : []),
         ],
       };
-      setLeads(
-        modal.record
-          ? leads.map((l) => (l.id === lead.id ? lead : l))
-          : [lead, ...leads],
-      );
+      if (modal.record) {
+        setLeads(leads.map((l) => (l.id === lead.id ? lead : l)));
+        api.updateLead(lead.id, lead);
+      } else {
+        setLeads([lead, ...leads]);
+        api.createLead(lead).then((saved) => {
+          if (saved) {
+            setLeads((prev) =>
+              prev.map((l) => (l.id === lead.id ? normalizeLead(saved) : l)),
+            );
+          }
+        });
+      }
       notify(modal.record ? "Lead updated" : "Lead added successfully");
     }
     if (modal.type === "followup") {
-      const lead = leads.find((l) => l.id === Number(data.leadId));
+      const lead = leads.find((l) => l.id === Number(data.leadId)) || {};
       const f = {
         ...lead,
         ...data,
         id: modal.record?.id || Date.now(),
-        leadId: lead.id,
+        leadId: lead.id || data.leadId,
         completed: false,
         purpose: data.notes || "Follow up with customer",
       };
-      setFollowups(
-        modal.record
-          ? followups.map((x) => (x.id === f.id ? f : x))
-          : [f, ...followups],
-      );
-      updateLead({
-        ...lead,
-        date: data.date,
-        time: data.time,
-        activities: [
-          ...lead.activities,
-          {
-            text: "Follow-up scheduled for " + data.date + " at " + data.time,
-            time: "Just now",
-          },
-        ],
-      });
+      if (modal.record) {
+        setFollowups(followups.map((x) => (x.id === f.id ? f : x)));
+        api.updateFollowup(f.id, f);
+      } else {
+        setFollowups([f, ...followups]);
+        api.createFollowup(f).then((saved) => {
+          if (saved) {
+            setFollowups((prev) =>
+              prev.map((x) => (x.id === f.id ? normalizeLead(saved) : x)),
+            );
+          }
+        });
+      }
+      if (lead.id) {
+        updateLead({
+          ...lead,
+          date: data.date,
+          time: data.time,
+          activities: [
+            ...(lead.activities || []),
+            {
+              text: "Follow-up scheduled for " + data.date + " at " + data.time,
+              time: "Just now",
+            },
+          ],
+        });
+      }
       notify("Follow-up scheduled");
     }
     if (modal.type === "user") {
@@ -525,7 +578,7 @@ export default function CRMApp() {
           )}
         </div>
         <div className="nav-actions">
-          <span className="demo-pill">DEMO WORKSPACE</span>
+          <span className="demo-pill">ENTRAIN CRM</span>
           <button
             className="notification-button icon-button"
             aria-label="Notifications"
@@ -781,7 +834,7 @@ export default function CRMApp() {
                 <DateRangeFilter value={period} onChange={setPeriod} />
                 {page === "dashboard" && (
                   <span className="muted">
-                    <CalendarClock size={13} /> Monday, 28 September 2026
+                    <CalendarClock size={13} /> {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                   </span>
                 )}
               </div>
@@ -792,6 +845,7 @@ export default function CRMApp() {
                 leads={scopedLeads}
                 people={people}
                 followups={scopedFollowups}
+                calls={callsState}
                 navigate={navigate}
                 openModal={setModal}
                 period={period}
@@ -848,7 +902,7 @@ export default function CRMApp() {
               />
             )}
             {page === "calls" && (
-              <CallsPage allowedNames={scopedNames} notify={notify} />
+              <CallsPage calls={callsState} allowedNames={scopedNames} notify={notify} />
             )}
             {page === "customers" && (
               <CustomersPage leads={scopedLeads} navigate={navigate} />
@@ -868,6 +922,9 @@ export default function CRMApp() {
                     ? people.filter((p) => scopedNames.includes(p.name))
                     : people
                 }
+                leads={scopedLeads}
+                calls={callsState}
+                followups={scopedFollowups}
                 openModal={setModal}
                 role={role}
               />
@@ -880,6 +937,9 @@ export default function CRMApp() {
                     ? people.filter((p) => scopedNames.includes(p.name))
                     : people
                 }
+                leads={scopedLeads}
+                followups={scopedFollowups}
+                calls={callsState}
                 period={period}
                 onPeriodChange={setPeriod}
                 exportData={exportData}
@@ -893,7 +953,7 @@ export default function CRMApp() {
               />
             )}
             {page === "settings" && <SettingsPage notify={notify} />}
-            {page === "tasks" && <TasksPage />}
+            {page === "tasks" && <TasksPage tasks={tasks} setTasks={setTasks} />}
           </>
         )}
       </main>

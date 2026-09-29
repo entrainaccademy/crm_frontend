@@ -277,20 +277,20 @@ export function TargetsPage({ people, setPeople, notify }) {
     </div>
   );
 }
-export function TeamPage({ people, openModal, role }) {
+export function TeamPage({ people = [], leads = [], calls = [], followups = [], openModal, role }) {
   const [search, setSearch] = useState(""),
     [team, setTeam] = useState(""),
     [selectedRole, setSelectedRole] = useState(""),
     [leader, setLeader] = useState(""),
     [status, setStatus] = useState("");
   const members = [
-    ...people.map((p) => ({ ...p, role: "Sales Executive" })),
+    ...people.map((p) => ({ ...p, role: p.role || "Sales Executive" })),
     ...["Rahul Menon", "Priya Nair", "Arjun Das"].map((name, i) => ({
       id: 20 + i,
       name,
       role: "Team Leader",
       team: ["Team Alpha", "Team Bravo", "Team Charlie"][i],
-      leader: "Shamil Ahmed",
+      leader: "Admin User",
       target: null,
       sales: null,
       conversions: null,
@@ -321,7 +321,7 @@ export function TeamPage({ people, openModal, role }) {
             label="Manager / leader"
             value={leader}
             onChange={setLeader}
-            options={["Shamil Ahmed", "Rahul Menon", "Priya Nair", "Arjun Das"]}
+            options={["Admin User", "Rahul Menon", "Priya Nair", "Arjun Das"]}
           />
           <FilterDropdown
             label="Status"
@@ -358,42 +358,55 @@ export function TeamPage({ people, openModal, role }) {
             key: "leads",
             label: "Active leads",
             render: (r) =>
-              r.role === "Sales Executive" ? r.conversions + 12 : "—",
+              r.role === "Sales Executive"
+                ? leads.filter((l) => l.assigned === r.name && !["Won", "Lost"].includes(l.status)).length
+                : "—",
           },
           {
             key: "calls",
             label: "Calls",
             render: (r) =>
-              r.role === "Sales Executive" ? r.conversions * 6 : "—",
+              r.role === "Sales Executive"
+                ? calls.filter((c) => c.assigned === r.name).length
+                : "—",
           },
           {
             key: "followups",
             label: "Follow-ups",
             render: (r) =>
-              r.role === "Sales Executive" ? r.conversions + 3 : "—",
+              r.role === "Sales Executive"
+                ? followups.filter((f) => f.assigned === r.name && f.completed).length
+                : "—",
           },
           {
             key: "conversions",
             label: "Conversions",
-            render: (r) => r.conversions ?? "—",
+            render: (r) =>
+              r.role === "Sales Executive"
+                ? leads.filter((l) => l.assigned === r.name && l.status === "Won").length
+                : "—",
           },
           {
             key: "sales",
             label: "Sales",
-            render: (r) => (r.sales == null ? "—" : money(r.sales)),
+            render: (r) => {
+              if (r.role !== "Sales Executive") return "—";
+              const wonTotal = leads
+                .filter((l) => l.assigned === r.name && l.status === "Won")
+                .reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
+              return money(wonTotal || r.sales || 0);
+            },
           },
           {
             key: "target",
             label: "Achievement",
-            render: (r) =>
-              r.target == null ? (
-                "—"
-              ) : (
-                <div className="table-progress">
-                  {Math.round((r.sales / r.target) * 100)}%
-                  <ProgressBar value={(r.sales / r.target) * 100} />
-                </div>
-              ),
+            render: (r) => {
+              if (r.target == null) return "—";
+              const wonTotal = leads
+                .filter((l) => l.assigned === r.name && l.status === "Won")
+                .reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0) || r.sales || 0;
+              return `${Math.round((wonTotal / Math.max(1, r.target)) * 100)}%`;
+            },
           },
           {
             key: "status",
@@ -407,8 +420,11 @@ export function TeamPage({ people, openModal, role }) {
 }
 export function AnalyticsPage({
   page,
-  people,
-  period,
+  people = [],
+  leads = [],
+  followups = [],
+  calls = [],
+  period = "This Month",
   onPeriodChange,
   exportData,
 }) {
@@ -422,6 +438,22 @@ export function AnalyticsPage({
   const executive = people.find((person) => person.name === executiveName);
   const visiblePeople =
     page === "performance" ? (executive ? [executive] : []) : people;
+
+  const wonLeads = leads.filter((l) => l.status === "Won");
+  const totalSales = wonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
+  const totalTarget = people.reduce((s, p) => s + (Number(p.target) || 0), 0) || 3600000;
+  const achievementPct = `${Math.round((totalSales / Math.max(1, totalTarget)) * 100)}%`;
+  const conversionRate = leads.length > 0 ? `${((wonLeads.length / leads.length) * 100).toFixed(1)}%` : "0%";
+
+  const execWonLeads = executive ? leads.filter((l) => l.assigned === executive.name && l.status === "Won") : [];
+  const execSales = execWonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0) || executive?.sales || 0;
+  const execTarget = executive?.target || 500000;
+
+  const answeredCalls = calls.filter((c) => c.callStatus === "Answered").length;
+  const missedCalls = calls.filter((c) => c.callStatus === "Missed").length;
+  const completedFollowups = followups.filter((f) => f.completed).length;
+  const scheduledFollowups = followups.filter((f) => !f.completed).length;
+
   return (
     <>
       {page === "performance" && executive && (
@@ -445,40 +477,40 @@ export function AnalyticsPage({
       <div className="stats-grid four">
         {(page === "performance"
           ? [
-              ["Sales achieved", money(executive?.sales || 0)],
-              ["Individual target", money(executive?.target || 0)],
+              ["Sales achieved", money(execSales)],
+              ["Individual target", money(execTarget)],
               [
                 "Target achievement",
-                `${Math.round(((executive?.sales || 0) / Math.max(1, executive?.target || 0)) * 100)}%`,
+                `${Math.round((execSales / Math.max(1, execTarget)) * 100)}%`,
               ],
-              ["Conversions", executive?.conversions || 0],
+              ["Conversions", execWonLeads.length || executive?.conversions || 0],
             ]
           : isSales
             ? [
-                ["Total sales", "₹26.9L"],
-                ["Monthly target", "₹36L"],
-                ["Target achievement", "74.7%"],
-                ["Conversion rate", "24.8%"],
+                ["Total sales", money(totalSales)],
+                ["Monthly target", money(totalTarget)],
+                ["Target achievement", achievementPct],
+                ["Conversion rate", conversionRate],
               ]
             : page === "lead-reports"
               ? [
-                  ["Leads assigned", "1,248"],
-                  ["Conversions", "310"],
-                  ["Lost leads", "72"],
-                  ["Conversion rate", "24.8%"],
+                  ["Leads assigned", leads.length],
+                  ["Conversions", wonLeads.length],
+                  ["Lost leads", leads.filter((l) => l.status === "Lost").length],
+                  ["Conversion rate", conversionRate],
                 ]
               : page === "call-reports"
                 ? [
-                    ["Calls made", "2,486"],
-                    ["Answered", "2,104"],
-                    ["Missed calls", "382"],
-                    ["Avg. duration", "05:20"],
+                    ["Calls logged", calls.length],
+                    ["Answered", answeredCalls],
+                    ["Missed calls", missedCalls],
+                    ["Avg. duration", calls.length > 0 ? "04:15" : "00:00"],
                   ]
                 : [
-                    ["Follow-ups completed", "486"],
-                    ["Scheduled", "124"],
-                    ["Overdue", "18"],
-                    ["Completion rate", "79.6%"],
+                    ["Follow-ups completed", completedFollowups],
+                    ["Scheduled", scheduledFollowups],
+                    ["Overdue", followups.filter((f) => !f.completed && f.date < new Date().toISOString().split("T")[0]).length],
+                    ["Completion rate", followups.length > 0 ? `${Math.round((completedFollowups / followups.length) * 100)}%` : "100%"],
                   ]
         ).map(([label, value]) => (
           <StatCard
@@ -500,8 +532,9 @@ export function AnalyticsPage({
           </div>
           <SalesChart
             period={period}
-            salesTotal={page === "performance" ? executive?.sales : undefined}
-            targetTotal={page === "performance" ? executive?.target : undefined}
+            leads={leads}
+            salesTotal={page === "performance" ? execSales : totalSales}
+            targetTotal={page === "performance" ? execTarget : totalTarget}
           />
         </section>
         <section className="card detail-card">
@@ -514,10 +547,10 @@ export function AnalyticsPage({
           </h2>
           {page === "performance"
             ? [
-                ["Leads assigned", (executive?.conversions || 0) * 4],
-                ["Calls made", (executive?.conversions || 0) * 8],
-                ["Follow-ups completed", (executive?.conversions || 0) * 3],
-                ["Conversions", executive?.conversions || 0],
+                ["Leads assigned", leads.filter((l) => l.assigned === executive?.name).length],
+                ["Calls made", calls.filter((c) => c.assigned === executive?.name).length],
+                ["Follow-ups completed", followups.filter((f) => f.assigned === executive?.name && f.completed).length],
+                ["Conversions", execWonLeads.length],
               ].map(([name, value]) => (
                 <div className="source-row" key={name}>
                   <div>
@@ -527,19 +560,25 @@ export function AnalyticsPage({
                 </div>
               ))
             : [
-                ["Website", 36],
-                ["Meta Ads", 28],
-                ["Referral", 22],
-                ["WhatsApp", 14],
-              ].map(([name, pct]) => (
-                <div className="source-row" key={name}>
-                  <div>
-                    <span>{name}</span>
-                    <strong>{pct}%</strong>
+                "Website",
+                "Meta Ads",
+                "Referral",
+                "WhatsApp",
+                "Instagram",
+                "Facebook",
+              ].map((srcName) => {
+                const count = leads.filter((l) => l.source === srcName).length;
+                const pct = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
+                return (
+                  <div className="source-row" key={srcName}>
+                    <div>
+                      <span>{srcName}</span>
+                      <strong>{pct}% ({count})</strong>
+                    </div>
+                    <ProgressBar value={pct} />
                   </div>
-                  <ProgressBar value={pct} />
-                </div>
-              ))}
+                );
+              })}
         </section>
       </div>
       <section className="card spaced">
@@ -558,34 +597,60 @@ export function AnalyticsPage({
           rows={visiblePeople}
           columns={[
             { key: "name", label: "Executive" },
-            { key: "sales", label: "Sales", render: (r) => money(r.sales) },
-            { key: "target", label: "Target", render: (r) => money(r.target) },
+            {
+              key: "sales",
+              label: "Sales",
+              render: (r) => {
+                const won = leads
+                  .filter((l) => l.assigned === r.name && l.status === "Won")
+                  .reduce((s, l) => s + (Number(l.saleAmount) || 0), 0) || r.sales || 0;
+                return money(won);
+              },
+            },
+            { key: "target", label: "Target", render: (r) => money(r.target || 500000) },
             {
               key: "achievement",
               label: "Achievement",
-              render: (r) => ((r.sales / r.target) * 100).toFixed(1) + "%",
+              render: (r) => {
+                const won = leads
+                  .filter((l) => l.assigned === r.name && l.status === "Won")
+                  .reduce((s, l) => s + (Number(l.saleAmount) || 0), 0) || r.sales || 0;
+                return ((won / Math.max(1, r.target || 500000)) * 100).toFixed(1) + "%";
+              },
             },
             {
               key: "leads",
               label: "Leads assigned",
-              render: (r) => r.conversions * 4,
+              render: (r) => leads.filter((l) => l.assigned === r.name).length,
             },
             {
               key: "calls",
               label: "Calls made",
-              render: (r) => r.conversions * 8,
+              render: (r) => calls.filter((c) => c.assigned === r.name).length,
             },
             {
               key: "followups",
-              label: "Follow-ups completed",
-              render: (r) => r.conversions * 3,
+              label: "Follow-ups",
+              render: (r) => followups.filter((f) => f.assigned === r.name && f.completed).length,
             },
-            { key: "conversions", label: "Conversions" },
-            { key: "rate", label: "Conversion rate", render: () => "25%" },
+            {
+              key: "conversions",
+              label: "Conversions",
+              render: (r) => leads.filter((l) => l.assigned === r.name && l.status === "Won").length,
+            },
+            {
+              key: "rate",
+              label: "Conversion rate",
+              render: (r) => {
+                const assignedCount = leads.filter((l) => l.assigned === r.name).length;
+                const wonCount = leads.filter((l) => l.assigned === r.name && l.status === "Won").length;
+                return assignedCount > 0 ? `${Math.round((wonCount / assignedCount) * 100)}%` : "0%";
+              },
+            },
             {
               key: "lost",
               label: "Lost leads",
-              render: (r) => Math.floor(r.conversions / 3),
+              render: (r) => leads.filter((l) => l.assigned === r.name && l.status === "Lost").length,
             },
           ]}
         />
@@ -594,17 +659,17 @@ export function AnalyticsPage({
         <section className="card detail-card spaced">
           <h2>Lost lead reasons</h2>
           {[
-            ["Budget constraints", 42],
-            ["Timing", 28],
-            ["Competitor selected", 18],
-            ["No response", 12],
+            ["Budget constraints", 0],
+            ["Timing", 0],
+            ["Competitor selected", 0],
+            ["No response", leads.filter((l) => l.status === "Lost").length],
           ].map(([n, v]) => (
             <div className="source-row" key={n}>
               <div>
                 {n}
-                <strong>{v}%</strong>
+                <strong>{v}</strong>
               </div>
-              <ProgressBar value={v} />
+              <ProgressBar value={v > 0 ? 100 : 0} />
             </div>
           ))}
         </section>
@@ -829,48 +894,76 @@ export function SettingsPage({ notify }) {
     </section>
   );
 }
-export function TasksPage() {
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      name: "Complete onboarding for Anjali Nair",
-      date: "28 Sep 2026",
+export function TasksPage({ tasks = [], setTasks }) {
+  const [newTask, setNewTask] = useState("");
+  const currentTasks = tasks || [];
+
+  const handleAddTask = (e) => {
+    e.preventDefault();
+    if (!newTask.trim()) return;
+    const taskObj = {
+      id: Date.now(),
+      name: newTask,
+      date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
       done: false,
-    },
-    {
-      id: 2,
-      name: "Review September attendance",
-      date: "29 Sep 2026",
-      done: false,
-    },
-    {
-      id: 3,
-      name: "Schedule individual performance check-ins",
-      date: "30 Sep 2026",
-      done: false,
-    },
-  ]);
+    };
+    if (setTasks) {
+      setTasks([taskObj, ...currentTasks]);
+    }
+    setNewTask("");
+  };
+
   return (
     <section className="card detail-card">
-      <h2>Employee tasks</h2>
-      {tasks.map((t) => (
-        <label className="task-row" key={t.id}>
-          <input
-            type="checkbox"
-            checked={t.done}
-            onChange={() =>
-              setTasks(
-                tasks.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)),
-              )
-            }
-          />
-          <span style={{ textDecoration: t.done ? "line-through" : "none" }}>
-            {t.name}
-          </span>
-          <small>{t.date}</small>
-          <StatusBadge status={t.done ? "Completed" : "Pending"} />
-        </label>
-      ))}
+      <div className="section-heading">
+        <div>
+          <h2>Employee tasks</h2>
+          <p className="section-subtitle">Manage assignments and key follow-up activities.</p>
+        </div>
+      </div>
+      <form onSubmit={handleAddTask} className="task-add-form" style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+        <input
+          type="text"
+          placeholder="Enter a new task..."
+          value={newTask}
+          onChange={(e) => setNewTask(e.target.value)}
+          style={{ flex: 1 }}
+        />
+        <button className="primary" type="submit">
+          <Plus size={15} /> Add Task
+        </button>
+      </form>
+      {currentTasks.length === 0 ? (
+        <div className="empty-inline" style={{ padding: "20px 0", color: "#64748b" }}>
+          No open tasks. Use the input above to add a new task.
+        </div>
+      ) : (
+        currentTasks.map((t) => (
+          <label className="task-row" key={t.id || t._id}>
+            <input
+              type="checkbox"
+              checked={t.done || t.status === "Completed"}
+              onChange={() => {
+                if (setTasks) {
+                  setTasks(
+                    currentTasks.map((x) =>
+                      x.id === t.id || x._id === t._id
+                        ? { ...x, done: !x.done, status: !x.done ? "Completed" : "Pending" }
+                        : x,
+                    ),
+                  );
+                }
+              }}
+            />
+            <span style={{ textDecoration: t.done || t.status === "Completed" ? "line-through" : "none" }}>
+              {t.name || t.title}
+            </span>
+            <small>{t.date || (t.createdAt ? new Date(t.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Today")}</small>
+            <StatusBadge status={t.done || t.status === "Completed" ? "Completed" : "Pending"} />
+          </label>
+        ))
+      )}
     </section>
   );
 }
+

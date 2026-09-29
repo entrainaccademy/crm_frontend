@@ -7,8 +7,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
 } from "recharts";
 import {
   ArrowUpRight,
@@ -22,8 +20,6 @@ import {
   TrendingUp,
   Target,
   Trophy,
-  ChevronRight,
-  Plus,
 } from "lucide-react";
 import {
   StatCard,
@@ -32,23 +28,29 @@ import {
   StatusBadge,
   DataTable,
 } from "./ui";
-import { money, shortMoney, rankExecutives, chartData } from "@/lib/data";
-export function SalesChart({ period = "This Month", salesTotal, targetTotal }) {
-  const multiplier =
-    period === "Today" ? 0.12 : period === "This Week" ? 0.35 : 1;
-  const lastPoint = chartData.at(-1);
-  const salesScale =
-    salesTotal == null ? 1 : salesTotal / 100000 / lastPoint.sales;
-  const targetScale =
-    targetTotal == null ? 1 : targetTotal / 100000 / lastPoint.target;
+import { money, shortMoney, rankExecutives } from "@/lib/data";
+
+export function SalesChart({ period = "This Month", salesTotal, targetTotal, leads = [] }) {
+  const days = ["1", "5", "10", "15", "20", "25", "28", "30"];
+  const currentMonth = new Date().toLocaleString("default", { month: "short" });
+  
+  const wonLeads = leads.filter((l) => l.status === "Won");
+  const totalSalesVal = salesTotal ?? wonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
+  const totalTargetVal = targetTotal ?? 3600000;
+
+  const dynamicChartData = days.map((day, i) => {
+    const progress = (i + 1) / days.length;
+    return {
+      day: `${day} ${currentMonth}`,
+      sales: Number(((totalSalesVal * progress) / 100000).toFixed(1)),
+      target: Number(((totalTargetVal * progress) / 100000).toFixed(1)),
+    };
+  });
+
   return (
     <ResponsiveContainer width="100%" height={225}>
       <AreaChart
-        data={chartData.map((x) => ({
-          ...x,
-          sales: Number((x.sales * multiplier * salesScale).toFixed(1)),
-          target: Number((x.target * multiplier * targetScale).toFixed(1)),
-        }))}
+        data={dynamicChartData}
         margin={{ top: 15, right: 10, left: -25, bottom: 0 }}
       >
         <CartesianGrid
@@ -96,18 +98,24 @@ export function SalesChart({ period = "This Month", salesTotal, targetTotal }) {
     </ResponsiveContainer>
   );
 }
+
 export function TargetCard({ person }) {
-  const pct = Math.round((person.sales / person.target) * 100);
+  if (!person) return null;
+  const sales = person.sales || 0;
+  const target = person.target || 500000;
+  const pct = Math.round((sales / Math.max(1, target)) * 100);
+  const currentMonthName = new Date().toLocaleString("default", { month: "long", year: "numeric" });
+
   return (
     <section className="card target-card">
       <div className="section-heading">
         <h2>
           <Target size={16} /> My monthly target
         </h2>
-        <span className="muted">September 2026</span>
+        <span className="muted">{currentMonthName}</span>
       </div>
       <div className="target-total">
-        {shortMoney(person.sales)} <span>/ {shortMoney(person.target)}</span>
+        {shortMoney(sales)} <span>/ {shortMoney(target)}</span>
         <b>{pct}%</b>
       </div>
       <ProgressBar value={pct} />
@@ -115,23 +123,26 @@ export function TargetCard({ person }) {
         <span>
           {pct >= 100
             ? "Target achieved"
-            : `${shortMoney(person.target - person.sales)} remaining`}
+            : `${shortMoney(Math.max(0, target - sales))} remaining`}
         </span>
         <span>
-          Position <strong>#4</strong>
+          Target Status: <strong>{pct >= 100 ? "Completed" : "In Progress"}</strong>
         </span>
       </div>
       <div className="target-note">
         <TrendingUp size={16} />
         {pct >= 100
-          ? `${money(person.sales - person.target)} above target`
-          : "You’re making great progress. Keep it going!"}
+          ? `${money(sales - target)} above target`
+          : "Keep logging interactions to reach your monthly goal."}
       </div>
     </section>
   );
 }
+
 export function LeaderboardRow({ person, index }) {
-  const pct = Math.round((person.sales / person.target) * 100);
+  const sales = person.sales || 0;
+  const target = person.target || 1;
+  const pct = Math.round((sales / Math.max(1, target)) * 100);
   return (
     <div className="leaderboard-row">
       <span className={`rank ${index < 3 ? "top-rank" : ""}`}>
@@ -139,9 +150,9 @@ export function LeaderboardRow({ person, index }) {
       </span>
       <UserAvatar name={person.name} index={index} />
       <div className="leader-person">
-        <strong>{person.short}</strong>
+        <strong>{person.short || person.name}</strong>
         <small>
-          {shortMoney(person.sales)} <span>/ {shortMoney(person.target)}</span>
+          {shortMoney(sales)} <span>/ {shortMoney(target)}</span>
         </small>
       </div>
       <div className="leader-progress">
@@ -153,7 +164,9 @@ export function LeaderboardRow({ person, index }) {
     </div>
   );
 }
-export function Leaderboard({ people, navigate }) {
+
+export function Leaderboard({ people = [], navigate }) {
+  const ranked = rankExecutives(people);
   return (
     <section className="card leaderboard-card">
       <div className="section-heading">
@@ -163,66 +176,63 @@ export function Leaderboard({ people, navigate }) {
         <span className="tiny-tag">THIS MONTH</span>
       </div>
       <p className="section-subtitle">
-        A little recognition for exceptional work.
+        Performance and goal tracking for sales team members.
       </p>
-      {rankExecutives(people)
-        .slice(0, 5)
-        .map((p, i) => (
-          <LeaderboardRow key={p.id} person={p} index={i} />
-        ))}
+      {ranked.length === 0 ? (
+        <div className="empty-inline">No executive records found.</div>
+      ) : (
+        ranked.slice(0, 5).map((p, i) => (
+          <LeaderboardRow key={p.id || i} person={p} index={i} />
+        ))
+      )}
       <button className="card-link" onClick={() => navigate("leaderboard")}>
         View full leaderboard <ArrowRight size={14} />
       </button>
     </section>
   );
 }
+
 export default function Dashboard({
   role,
-  leads,
-  people,
-  followups,
+  leads = [],
+  people = [],
+  followups = [],
+  calls = [],
   navigate,
   openModal,
-  period,
+  period = "This Month",
 }) {
-  const scoped = role === "Sales Executive" || role === "Team Leader";
-  const factor = period === "Today" ? 1 : period === "This Week" ? 4 : 12;
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const totalLeads = leads.length;
+  const newLeads = leads.filter((l) => l.status === "New").length;
+  const followupsToday = followups.filter((f) => !f.completed && f.date === todayStr).length;
+  const overdueFollowups = followups.filter((f) => !f.completed && f.date < todayStr).length;
+  const callsToday = calls.filter((c) => c.callDate === todayStr || c.callDate === "Today").length || calls.length;
+  const wonLeads = leads.filter((l) => l.status === "Won");
+  const convertedLeads = wonLeads.length;
+
+  const totalAchievedSales = wonLeads.reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
+  const totalTargetSales = people.reduce((sum, p) => sum + (Number(p.target) || 0), 0) || 3600000;
+  const overallAchievement = Math.round((totalAchievedSales / Math.max(1, totalTargetSales)) * 100);
+
   const stats = [
-    ["Total leads", scoped ? leads.length : 1248, "12.8%", Users],
-    [
-      "New leads",
-      scoped ? leads.filter((l) => l.status === "New").length : 48 * factor,
-      "18.4%",
-      UserPlus,
-    ],
-    [
-      "Follow-ups today",
-      followups.filter((f) => !f.completed && f.date === "2026-09-28").length,
-      "8.2%",
-      CalendarClock,
-    ],
-    [
-      "Overdue follow-ups",
-      followups.filter((f) => !f.completed && f.date < "2026-09-28").length,
-      "2.1%",
-      Clock,
-    ],
-    ["Calls today", scoped ? leads.length * 3 : 86, "16.2%", Phone],
-    [
-      "Converted leads",
-      scoped ? leads.filter((l) => l.status === "Won").length : 32 * factor,
-      "24.6%",
-      CheckCircle2,
-    ],
+    ["Total leads", totalLeads, totalLeads > 0 ? `${totalLeads} active` : "No leads", Users],
+    ["New leads", newLeads, newLeads > 0 ? `${newLeads} new` : "0 new", UserPlus],
+    ["Follow-ups today", followupsToday, followupsToday > 0 ? "Due today" : "None due", CalendarClock],
+    ["Overdue follow-ups", overdueFollowups, overdueFollowups > 0 ? "Action needed" : "Up to date", Clock],
+    ["Calls logged", callsToday, `${calls.length} total`, Phone],
+    ["Converted leads", convertedLeads, totalLeads > 0 ? `${Math.round((convertedLeads / totalLeads) * 100)}% conv.` : "0%", CheckCircle2],
   ];
-  if (role === "HR")
+
+  if (role === "HR") {
     return (
       <>
         <div className="stats-grid four">
           {[
-            ["Team members", 11],
-            ["Active employees", 11],
-            ["Open tasks", 3],
+            ["Team members", people.length],
+            ["Active employees", people.length],
+            ["Open tasks", 0],
             ["Team leaders", 3],
           ].map(([label, value]) => (
             <StatCard
@@ -230,7 +240,7 @@ export default function Dashboard({
               label={label}
               value={value}
               icon={Users}
-              change="This month"
+              change="Active team"
               showComparison={false}
             />
           ))}
@@ -241,7 +251,7 @@ export default function Dashboard({
               <div>
                 <h2>Your people, at a glance</h2>
                 <p className="section-subtitle">
-                  Employee information and basic performance.
+                  Employee information and team performance.
                 </p>
               </div>
               <button onClick={() => navigate("team")}>
@@ -262,7 +272,7 @@ export default function Dashboard({
                   ),
                 },
                 { key: "team", label: "Team" },
-                { key: "conversions", label: "Conversions" },
+                { key: "conversions", label: "Conversions", render: (r) => r.conversions || 0 },
                 {
                   key: "status",
                   label: "Status",
@@ -271,19 +281,46 @@ export default function Dashboard({
               ]}
             />
             <button className="card-link" onClick={() => navigate("tasks")}>
-              Review 3 employee tasks <ArrowRight size={14} />
+              Review employee tasks <ArrowRight size={14} />
             </button>
           </section>
           <Leaderboard people={people} navigate={navigate} />
         </div>
       </>
     );
+  }
+
+  const activePipelineLeads = leads.filter((l) => !["Won", "Lost"].includes(l.status));
+  const activePipelineValue = activePipelineLeads.reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
+
+  const stageCounts = [
+    { name: "New leads", status: "New", color: "#315d8c" },
+    { name: "Contacted", status: "Contacted", color: "#6085ab" },
+    { name: "Interested", status: "Interested", color: "#c29a58" },
+    { name: "Quotation", status: "Quotation", color: "#8fad9f" },
+  ].map((st) => {
+    const matches = leads.filter((l) => l.status === st.status);
+    const sum = matches.reduce((acc, l) => acc + (Number(l.saleAmount) || 0), 0);
+    return {
+      name: st.name,
+      count: matches.length,
+      amount: money(sum),
+      color: st.color,
+    };
+  });
+
+  const todayFollowupRows = followups
+    .filter((x) => !x.completed && (x.date === todayStr || !x.date))
+    .slice(0, 3);
+
+  const activeSalesExec = people.find((x) => x.role === "Sales Executive") || people[0];
+
   return (
     <>
       <div className="overview-label">
         <span>BUSINESS OVERVIEW</span>
         <span className="live-dot" /> Live overview{" "}
-        <small>Updated just now</small>
+        <small>Real-time database sync</small>
       </div>
       <div className="stats-grid dashboard-stats">
         {stats.map(([label, value, change, icon], i) => (
@@ -293,12 +330,12 @@ export default function Dashboard({
             value={value}
             change={change}
             icon={icon}
-            negative={i === 3}
+            negative={i === 3 && value > 0}
           />
         ))}
       </div>
-      {role === "Sales Executive" && (
-        <TargetCard person={people.find((x) => x.id === 4)} />
+      {role === "Sales Executive" && activeSalesExec && (
+        <TargetCard person={activeSalesExec} />
       )}
       <div className="dashboard-main">
         <section className="card sales-card">
@@ -306,7 +343,7 @@ export default function Dashboard({
             <div>
               <h2>Sales overview</h2>
               <p className="section-subtitle">
-                Your revenue performance at a glance
+                Revenue performance from converted opportunities
               </p>
             </div>
             <select aria-label="Sales overview metric">
@@ -315,12 +352,12 @@ export default function Dashboard({
             </select>
           </div>
           <div className="revenue-line">
-            <strong>₹26,90,000</strong>
+            <strong>{money(totalAchievedSales)}</strong>
             <span className="positive">
               <ArrowUpRight size={13} />
-              18.6%
+              {overallAchievement}%
             </span>
-            <small>vs. last month</small>
+            <small>of target</small>
             <div className="chart-legend">
               <span>
                 <i />
@@ -332,13 +369,13 @@ export default function Dashboard({
               </span>
             </div>
           </div>
-          <SalesChart period={period} />
+          <SalesChart period={period} leads={leads} salesTotal={totalAchievedSales} targetTotal={totalTargetSales} />
           <div className="chart-footer">
             <span>
-              Monthly target <strong>₹36,00,000</strong>
+              Target <strong>{money(totalTargetSales)}</strong>
             </span>
             <span>
-              <span className="positive">74.7%</span> of target achieved
+              <span className="positive">{overallAchievement}%</span> of target achieved
             </span>
           </div>
         </section>
@@ -351,15 +388,11 @@ export default function Dashboard({
               <h2>
                 Today’s follow-ups{" "}
                 <span className="count-pill">
-                  {
-                    followups.filter(
-                      (x) => !x.completed && x.date === "2026-09-28",
-                    ).length
-                  }
+                  {todayFollowupRows.length}
                 </span>
               </h2>
               <p className="section-subtitle">
-                A timely conversation makes all the difference.
+                Follow-ups scheduled for today.
               </p>
             </div>
             <button
@@ -389,7 +422,7 @@ export default function Dashboard({
                 label: "SCHEDULE",
                 render: (r) => (
                   <div>
-                    <strong>{r.time}</strong>
+                    <strong>{r.time || "10:30"}</strong>
                     <small>Today</small>
                   </div>
                 ),
@@ -408,9 +441,7 @@ export default function Dashboard({
                 ),
               },
             ]}
-            rows={followups
-              .filter((x) => !x.completed && x.date === "2026-09-28")
-              .slice(0, 3)}
+            rows={todayFollowupRows}
           />
         </section>
         <section className="card pipeline-summary">
@@ -425,41 +456,33 @@ export default function Dashboard({
             </button>
           </div>
           <div className="pipeline-total">
-            <strong>₹48.6L</strong>
-            <span>across 186 active opportunities</span>
+            <strong>{money(activePipelineValue)}</strong>
+            <span>across {activePipelineLeads.length} active opportunities</span>
           </div>
           <div className="stacked-bar">
-            {[28, 22, 18, 20, 12].map((x, i) => (
-              <span
-                key={i}
-                style={{
-                  width: x + "%",
-                  background: [
-                    "#315d8c",
-                    "#6085ab",
-                    "#c29a58",
-                    "#8fad9f",
-                    "#dce5ef",
-                  ][i],
-                }}
-              />
-            ))}
+            {activePipelineLeads.length > 0 ? (
+              stageCounts.map((st, i) => {
+                const pct = Math.round((st.count / activePipelineLeads.length) * 100) || 0;
+                return (
+                  <span
+                    key={i}
+                    style={{
+                      width: `${pct}%`,
+                      background: st.color,
+                    }}
+                  />
+                );
+              })
+            ) : (
+              <span style={{ width: "100%", background: "#e2e8f0" }} />
+            )}
           </div>
-          {[
-            ["New leads", 52, "₹12.4L"],
-            ["Contacted", 41, "₹10.2L"],
-            ["Interested", 34, "₹9.8L"],
-            ["Quotation", 37, "₹11.6L"],
-          ].map(([name, count, amount], i) => (
-            <div className="pipeline-line" key={name}>
-              <i
-                style={{
-                  background: ["#315d8c", "#6085ab", "#c29a58", "#8fad9f"][i],
-                }}
-              />
-              <span>{name}</span>
-              <small>{count}</small>
-              <strong>{amount}</strong>
+          {stageCounts.map((st) => (
+            <div className="pipeline-line" key={st.name}>
+              <i style={{ background: st.color }} />
+              <span>{st.name}</span>
+              <small>{st.count}</small>
+              <strong>{st.amount}</strong>
             </div>
           ))}
         </section>

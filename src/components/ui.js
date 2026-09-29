@@ -235,7 +235,7 @@ export function ConfirmDialog({ title, onClose, onConfirm }) {
   return (
     <Modal title={title} onClose={onClose}>
       <p className="modal-copy">
-        You can sign back in to this demo with any role.
+        Are you sure you want to sign out? You can sign back in anytime.
       </p>
       <div className="modal-footer">
         <button onClick={onClose}>Cancel</button>
