@@ -131,6 +131,7 @@ export function EmptyState({
         alt=""
         width={1627}
         height={967}
+        loading="eager"
       />
       <h3>{title}</h3>
       <p>{description}</p>
