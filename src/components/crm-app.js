@@ -294,7 +294,7 @@ export default function CRMApp() {
   const scopedNames = role === "Sales Executive" ? [authUser?.name] : null;
   const userName = authUser?.name || "User";
   const readOnly = ["Super Admin", "Data Analytics Manager"].includes(role);
-  const canCreateLead = ["Data Analytics Manager", "Sales Executive"].includes(role);
+  const canCreateLead = ["Super Admin", "Data Analytics Manager"].includes(role);
   const canEditLead = (lead) =>
     role === "Sales Executive" ||
     (role === "Team Lead" && lead?.assigned === userName);
