@@ -176,7 +176,7 @@ export function Leaderboard({ people = [], navigate }) {
         <span className="tiny-tag">THIS MONTH</span>
       </div>
       <p className="section-subtitle">
-        Performance and goal tracking for sales executives.
+        Performance and goal tracking for salespeople.
       </p>
       {ranked.length === 0 ? (
         <div className="empty-inline">No executive records found.</div>
@@ -203,6 +203,7 @@ export default function Dashboard({
   openModal,
   period = "This Month",
   readOnly = false,
+  canWorkRecord = () => true,
 }) {
   const todayStr = new Date().toISOString().split("T")[0];
 
@@ -235,7 +236,7 @@ export default function Dashboard({
             ["Staff members", staff.length],
             ["Active employees", staff.filter((person) => person.status === "Active").length],
             ["Open tasks", 0],
-            ["Sales executives", people.length],
+            ["Salespeople", people.length],
           ].map(([label, value]) => (
             <StatCard
               key={label}
@@ -432,14 +433,14 @@ export default function Dashboard({
               !readOnly && {
                 key: "action",
                 label: "",
-                render: (r) => (
+                render: (r) => canWorkRecord(r) ? (
                   <button
                     className="small-button"
                     onClick={() => openModal({ type: "followup", record: r })}
                   >
                     <Phone size={13} /> Follow up
                   </button>
-                ),
+                ) : null,
               },
             ].filter(Boolean)}
             rows={todayFollowupRows}

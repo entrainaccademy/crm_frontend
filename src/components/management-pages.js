@@ -100,7 +100,7 @@ export function LeaderboardPage({ people }) {
             },
             {
               key: "name",
-              label: "Sales executive",
+              label: "Salesperson",
               render: (r, i) => (
                 <div className="person-cell">
                   <UserAvatar name={r.name} index={i} />
@@ -171,14 +171,14 @@ export function TargetsPage({ people, setPeople, notify }) {
       ),
     );
   if (!people.length) {
-    return <div className="card empty-inline">No sales executives yet. Create a Sales Executive account before assigning targets.</div>;
+    return <div className="card empty-inline">No salespeople yet. Create a Team Lead or Sales Executive account before assigning targets.</div>;
   }
   return (
     <div className="two-columns">
       <section className="card detail-card">
         <h2>Assign a sales target</h2>
         <p className="section-subtitle">
-          Set a monthly or quarterly goal for one sales executive.
+          Set a monthly or quarterly goal for one salesperson.
         </p>
         <form
           className="form-stack"
@@ -203,7 +203,7 @@ export function TargetsPage({ people, setPeople, notify }) {
           }}
         >
           <label>
-            Sales executive
+            Salesperson
             <select value={who} onChange={(e) => setWho(e.target.value)}>
               {people.map((person) => (
                 <option key={person.id} value={person.name}>
@@ -279,7 +279,7 @@ export function StaffPage({ people = [], leads = [], calls = [], followups = [],
             label="Role"
             value={selectedRole}
             onChange={setSelectedRole}
-            options={["Super Admin", "Sales Executive", "Manager", "HR", "Data Analytics Manager", "Team Lead"]}
+            options={["Super Admin", "Data Analytics Manager", "Team Lead", "Sales Executive"]}
           />
           <FilterDropdown
             label="Status"
@@ -313,7 +313,7 @@ export function StaffPage({ people = [], leads = [], calls = [], followups = [],
             key: "leads",
             label: "Active leads",
             render: (r) =>
-              r.role === "Sales Executive"
+              ["Sales Executive", "Team Lead"].includes(r.role)
                 ? leads.filter((l) => l.assigned === r.name && !["Won", "Lost"].includes(l.status)).length
                 : "—",
           },
@@ -321,7 +321,7 @@ export function StaffPage({ people = [], leads = [], calls = [], followups = [],
             key: "calls",
             label: "Calls",
             render: (r) =>
-              r.role === "Sales Executive"
+              ["Sales Executive", "Team Lead"].includes(r.role)
                 ? calls.filter((c) => c.assigned === r.name).length
                 : "—",
           },
@@ -329,7 +329,7 @@ export function StaffPage({ people = [], leads = [], calls = [], followups = [],
             key: "followups",
             label: "Follow-ups",
             render: (r) =>
-              r.role === "Sales Executive"
+              ["Sales Executive", "Team Lead"].includes(r.role)
                 ? followups.filter((f) => f.assigned === r.name && f.completed).length
                 : "—",
           },
@@ -337,7 +337,7 @@ export function StaffPage({ people = [], leads = [], calls = [], followups = [],
             key: "conversions",
             label: "Conversions",
             render: (r) =>
-              r.role === "Sales Executive"
+              ["Sales Executive", "Team Lead"].includes(r.role)
                 ? leads.filter((l) => l.assigned === r.name && l.status === "Won").length
                 : "—",
           },
@@ -345,7 +345,7 @@ export function StaffPage({ people = [], leads = [], calls = [], followups = [],
             key: "sales",
             label: "Sales",
             render: (r) => {
-              if (r.role !== "Sales Executive") return "—";
+              if (!["Sales Executive", "Team Lead"].includes(r.role)) return "—";
               const wonTotal = leads
                 .filter((l) => l.assigned === r.name && l.status === "Won")
                 .reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
@@ -415,7 +415,7 @@ export function AnalyticsPage({
         <div className="performance-toolbar">
           <DateRangeFilter value={period} onChange={onPeriodChange} />
           <label>
-            Sales executive
+            Salesperson
             <select
               value={executiveName}
               onChange={(event) => setSelectedExecutive(event.target.value)}
@@ -538,7 +538,7 @@ export function AnalyticsPage({
       </div>
       <section className="card spaced">
         <div className="section-heading">
-          <h2>Sales executive performance</h2>
+          <h2>Salesperson performance</h2>
           <div className="row-actions">
             <button onClick={() => exportData(visiblePeople, page)}>
               <Download size={14} /> Export CSV
@@ -632,7 +632,7 @@ export function AnalyticsPage({
     </>
   );
 }
-export function UsersPage({ users, setUsers, openModal, loadError = false }) {
+export function UsersPage({ users, openModal, onStatusChange, canManage = false, loading = false, loadError = false }) {
   const [tab, setTab] = useState("Users");
   return (
     <section className="card">
@@ -647,7 +647,22 @@ export function UsersPage({ users, setUsers, openModal, loadError = false }) {
           </button>
         ))}
       </div>
-      {tab === "Users" ? loadError ? (
+      {tab === "Users" ? loading ? (
+        <div className="users-table-loading" role="status" aria-label="Loading accounts">
+          <div aria-hidden="true">
+            <div className="workspace-skeleton-table-head skeleton-block" />
+            {Array.from({ length: 6 }, (_, row) => (
+              <div className="workspace-skeleton-table-row" key={row}>
+                <span className="workspace-skeleton-cell skeleton-block" />
+                <span className="workspace-skeleton-cell skeleton-block" />
+                <span className="workspace-skeleton-cell skeleton-block" />
+                <span className="workspace-skeleton-cell skeleton-block" />
+              </div>
+            ))}
+          </div>
+          <span className="workspace-skeleton-status">Loading accounts…</span>
+        </div>
+      ) : loadError ? (
         <div className="empty-inline" role="alert">Could not load accounts. Refresh the page and check the backend connection.</div>
       ) : (
         <DataTable
@@ -671,7 +686,7 @@ export function UsersPage({ users, setUsers, openModal, loadError = false }) {
               label: "Status",
               render: (r) => <StatusBadge status={r.status} />,
             },
-            {
+            canManage && {
               key: "actions",
               label: "Actions",
               render: (r) => (
@@ -682,26 +697,14 @@ export function UsersPage({ users, setUsers, openModal, loadError = false }) {
                     Edit
                   </button>
                   <button
-                    onClick={() =>
-                      setUsers(
-                        users.map((u) =>
-                          u.id === r.id
-                            ? {
-                                ...u,
-                                status:
-                                  u.status === "Active" ? "Inactive" : "Active",
-                              }
-                            : u,
-                        ),
-                      )
-                    }
+                    onClick={() => onStatusChange(r)}
                   >
                     {r.status === "Active" ? "Deactivate" : "Activate"}
                   </button>
                 </div>
               ),
             },
-          ]}
+          ].filter(Boolean)}
         />
       ) : (
         <div className="permissions-grid">

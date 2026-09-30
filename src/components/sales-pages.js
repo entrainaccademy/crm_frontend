@@ -29,7 +29,7 @@ import {
   EmptyState,
 } from "./ui";
 import { statuses, sources, calls, money } from "@/lib/data";
-export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = false }) {
+export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = false, canEditLead = () => true, canAssignLead = false }) {
   const [search, setSearch] = useState(""),
     [filters, setFilters] = useState(false),
     [status, setStatus] = useState(""),
@@ -148,21 +148,21 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
           },
           { key: "date", label: "Next follow-up" },
           { key: "created", label: "Created date" },
-          !readOnly && {
+          (!readOnly || canAssignLead) && {
             key: "actions",
             label: "",
-            render: (r) => (
+            render: (r) => (canEditLead(r) || canAssignLead) ? (
               <button
-                aria-label={"Edit " + r.name}
+                aria-label={(canEditLead(r) ? "Edit " : "Assign ") + r.name}
                 className="icon-button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  openModal({ type: "lead", record: r });
+                  openModal({ type: canEditLead(r) ? "lead" : "assignment", record: r });
                 }}
               >
                 <MoreHorizontal size={17} />
               </button>
-            ),
+            ) : null,
           },
         ].filter(Boolean)}
       />
@@ -194,7 +194,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
     </section>
   );
 }
-export function LeadDetails({ lead, openModal, notify, updateLead, navigate, readOnly = false }) {
+export function LeadDetails({ lead, openModal, notify, updateLead, navigate, readOnly = false, canAssignLead = false }) {
   const [note, setNote] = useState("");
   if (!lead) return <EmptyState title="Lead not found" />;
   const info = (title, fields) => (
@@ -227,6 +227,11 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
           </p>
         </div>
         <StatusBadge status={lead.status} />
+        {canAssignLead && (
+          <button className="primary" onClick={() => openModal({ type: "assignment", record: lead })}>
+            Assign lead
+          </button>
+        )}
         {!readOnly && <div className="toolbar-right">
           <button
             onClick={() =>
@@ -340,6 +345,7 @@ export function FollowupsPage({
   navigate,
   notify,
   readOnly = false,
+  canWorkRecord = () => true,
 }) {
   const [tab, setTab] = useState("Today");
   const todayStr = new Date().toISOString().split("T")[0];
@@ -375,7 +381,7 @@ export function FollowupsPage({
             render: (r) => <strong>{r.name}</strong>,
           },
           { key: "phone", label: "Phone" },
-          { key: "assigned", label: "Sales executive" },
+          { key: "assigned", label: "Assigned to" },
           { key: "date", label: "Follow-up date" },
           { key: "time", label: "Time" },
           { key: "purpose", label: "Purpose" },
@@ -402,7 +408,7 @@ export function FollowupsPage({
                 <button onClick={() => navigate("leads/" + r.leadId)}>
                   View
                 </button>
-                {!readOnly && <button
+                {!readOnly && canWorkRecord(r) && <button
                   aria-label="Call customer"
                   onClick={() =>
                     notify(
@@ -412,7 +418,7 @@ export function FollowupsPage({
                 >
                   <Phone size={14} />
                 </button>}
-                {!readOnly && !r.completed && (
+                {!readOnly && canWorkRecord(r) && !r.completed && (
                   <>
                     <button
                       onClick={() =>
@@ -511,7 +517,7 @@ export function LeadCard({ lead, navigate, onMove, onDragComplete, readOnly = fa
   );
 }
 
-export function PipelinePage({ leads, navigate, updateLead, readOnly = false }) {
+export function PipelinePage({ leads, navigate, updateLead, readOnly = false, canEditLead = () => true }) {
   const [search, setSearch] = useState(""),
     [owner, setOwner] = useState(""),
     [course, setCourse] = useState(""),
@@ -525,7 +531,7 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false }) 
       (!course || lead.service === course),
   );
   const moveLead = (lead, status) => {
-    if (readOnly) return;
+    if (readOnly || !canEditLead(lead)) return;
     if (lead.status === status) return;
     updateLead({
       ...lead,
@@ -601,7 +607,7 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false }) 
                   (item) =>
                     item.id === Number(e.dataTransfer.getData("text/plain")),
                 );
-                if (lead && !readOnly) moveLead(lead, status);
+                if (lead && !readOnly && canEditLead(lead)) moveLead(lead, status);
               }}
             >
               <div className="kanban-column-header">
@@ -628,7 +634,7 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false }) 
                       lead={lead}
                       navigate={navigate}
                       onMove={moveLead}
-                      readOnly={readOnly}
+                      readOnly={readOnly || !canEditLead(lead)}
                       onDragComplete={() => setDragOver("")}
                     />
                   ))
@@ -643,7 +649,7 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false }) 
     </section>
   );
 }
-export function CallsPage({ calls = [], allowedNames, notify, readOnly = false }) {
+export function CallsPage({ calls = [], allowedNames, notify, readOnly = false, canWorkRecord = () => true }) {
   const [search, setSearch] = useState("");
   const rows = (calls || []).filter(
     (c) =>
@@ -684,7 +690,7 @@ export function CallsPage({ calls = [], allowedNames, notify, readOnly = false }
           rows={rows}
           columns={[
             { key: "name", label: "Customer" },
-            { key: "assigned", label: "Sales executive" },
+            { key: "assigned", label: "Assigned to" },
             { key: "phone", label: "Phone" },
             { key: "direction", label: "Direction" },
             { key: "callDate", label: "Date" },
@@ -714,7 +720,7 @@ export function CallsPage({ calls = [], allowedNames, notify, readOnly = false }
             !readOnly && {
               key: "action",
               label: "Action",
-              render: (r) => (
+              render: (r) => canWorkRecord(r) ? (
                 <button
                   aria-label={"Call " + (r.name || "customer")}
                   onClick={() =>
@@ -723,7 +729,7 @@ export function CallsPage({ calls = [], allowedNames, notify, readOnly = false }
                 >
                   <Phone size={14} />
                 </button>
-              ),
+              ) : null,
             },
           ].filter(Boolean)}
         />

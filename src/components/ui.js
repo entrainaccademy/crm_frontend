@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { X, Search, ChevronDown, ArrowUpRight, Inbox } from "lucide-react";
+import Image from "next/image";
+import { X, Search, ChevronDown, ArrowUpRight } from "lucide-react";
 export function UserAvatar({ name = "Shamil", size = "", index = 0 }) {
   return (
     <span className={`avatar avatar-${index % 5} ${size}`}>
@@ -120,10 +121,17 @@ export function DateRangeFilter({ value, onChange }) {
 export function EmptyState({
   title = "No matching records",
   description = "Try changing your search or filters.",
+  compact = false,
 }) {
   return (
-    <div className="empty">
-      <Inbox size={32} />
+    <div className={`empty ${compact ? "empty-compact" : ""}`}>
+      <Image
+        className="empty-illustration"
+        src="/images/no-data-found-transparent.png"
+        alt=""
+        width={1627}
+        height={967}
+      />
       <h3>{title}</h3>
       <p>{description}</p>
     </div>
