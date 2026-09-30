@@ -70,8 +70,9 @@ export function StatCard({
 export function SearchInput({ value, onChange, placeholder = "Search…" }) {
   return (
     <div className="search-input">
-      <Search size={16} />
+      <Search size={15} />
       <input
+        type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
