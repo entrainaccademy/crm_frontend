@@ -28,7 +28,7 @@ import {
   StatCard,
   EmptyState,
 } from "./ui";
-import { statuses, sources, calls, money } from "@/lib/data";
+import { statuses, sources, priorities, closedStatuses, calls, money } from "@/lib/data";
 export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = false, canEditLead = () => true, canAssignLead = false }) {
   const [search, setSearch] = useState(""),
     [filters, setFilters] = useState(false),
@@ -72,15 +72,15 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
       {filters && (
         <div className="filter-row">
           {[
-            [status, setStatus, statuses, "Status"],
+            [status, setStatus, [...new Set([...statuses, ...leads.map((lead) => lead.status).filter(Boolean)])], "Status"],
             [
               assigned,
               setAssigned,
               [...new Set(leads.map((l) => l.assigned))],
               "Salesperson",
             ],
-            [source, setSource, sources, "Source"],
-            [priority, setPriority, ["High", "Medium", "Low"], "Priority"],
+            [source, setSource, [...new Set([...sources, ...leads.map((lead) => lead.source).filter(Boolean)])], "Source"],
+            [priority, setPriority, [...new Set([...priorities, ...leads.map((lead) => lead.priority).filter(Boolean)])], "Priority"],
             [
               service,
               setService,
@@ -450,9 +450,9 @@ const pipelineStageColors = {
   New: "#8798a1",
   Contacted: "#7194a5",
   "Follow-up": "#aa8a55",
-  Interested: "#5d9b87",
-  Quotation: "#8a85a6",
-  Won: "#469274",
+  Qualified: "#438a91",
+  Converted: "#3f9c70",
+  "Not Qualified": "#a88676",
   Lost: "#b28282",
 };
 
@@ -508,7 +508,7 @@ export function LeadCard({ lead, navigate, onMove, onDragComplete, readOnly = fa
           disabled={readOnly}
           onChange={(e) => onMove(lead, e.target.value)}
         >
-          {statuses.map((stage) => (
+          {[...statuses, ...(!statuses.includes(lead.status) ? [lead.status] : [])].map((stage) => (
             <option key={stage}>{stage}</option>
           ))}
         </select>
@@ -530,6 +530,7 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false, ca
       (!owner || lead.assigned === owner) &&
       (!course || lead.service === course),
   );
+  const pipelineStatuses = [...new Set([...statuses, ...leads.map((lead) => lead.status).filter(Boolean)])];
   const moveLead = (lead, status) => {
     if (readOnly || !canEditLead(lead)) return;
     if (lead.status === status) return;
@@ -550,10 +551,10 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false, ca
             {filtered.length} lead{filtered.length === 1 ? "" : "s"}
           </strong>
           <span>
-            across 7 stages ·{" "}
+            across {pipelineStatuses.length} stages ·{" "}
             {money(
               filtered
-                .filter((lead) => !["Won", "Lost"].includes(lead.status))
+                .filter((lead) => !closedStatuses.includes(lead.status))
                 .reduce((sum, lead) => sum + (lead.saleAmount || 0), 0),
             )}{" "}
             active pipeline value
@@ -585,13 +586,13 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false, ca
         aria-label="Sales pipeline stages"
         tabIndex={0}
       >
-        {statuses.map((status) => {
+        {pipelineStatuses.map((status) => {
           const stageLeads = filtered.filter((lead) => lead.status === status);
           return (
             <section
               className={`kanban-column ${dragOver === status ? "drag-over" : ""}`}
               key={status}
-              style={{ "--stage-color": pipelineStageColors[status] }}
+              style={{ "--stage-color": pipelineStageColors[status] || "#8a85a6" }}
               onDragOver={(e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = "move";

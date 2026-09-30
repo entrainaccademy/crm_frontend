@@ -26,25 +26,26 @@ export const rankExecutives = (people = []) =>
   });
 
 export const statuses = [
-  "New",
   "Contacted",
   "Follow-up",
-  "Interested",
-  "Quotation",
-  "Won",
+  "Qualified",
+  "Converted",
+  "Not Qualified",
   "Lost",
 ];
 
 export const sources = [
-  "Meta Ads",
-  "Instagram",
   "Facebook",
-  "Website",
   "WhatsApp",
-  "Referral",
-  "Walk-in",
+  "Instagram",
+  "Direct",
   "Other",
+  "Referral",
 ];
+
+export const priorities = ["Cold", "Warm", "Hot"];
+export const convertedStatuses = ["Won", "Converted"];
+export const closedStatuses = [...convertedStatuses, "Not Qualified", "Lost"];
 
 export const courses = [
   { name: "Dessert Workshop", fee: 180000 },
@@ -82,7 +83,7 @@ export const normalizeLead = (lead) => {
     saleAmount,
     advanceAmount: Number(
       lead.advanceAmount ??
-        (lead.status === "Won"
+        (convertedStatuses.includes(lead.status)
           ? Math.round((saleAmount * 0.25) / 1000) * 1000
           : 0),
     ),

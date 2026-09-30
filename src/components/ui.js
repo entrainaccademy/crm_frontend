@@ -30,12 +30,11 @@ export function ProgressBar({ value }) {
     </div>
   );
 }
-export function PageHeader({ title, description, children }) {
+export function PageHeader({ title, children }) {
   return (
     <div className="page-header">
       <div>
         <h1>{title}</h1>
-        <p>{description}</p>
       </div>
       <div className="header-actions">{children}</div>
     </div>

@@ -28,13 +28,13 @@ import {
   StatusBadge,
   DataTable,
 } from "./ui";
-import { money, shortMoney, rankExecutives } from "@/lib/data";
+import { money, shortMoney, rankExecutives, statuses, convertedStatuses, closedStatuses } from "@/lib/data";
 
 export function SalesChart({ period = "This Month", salesTotal, targetTotal, leads = [] }) {
   const days = ["1", "5", "10", "15", "20", "25", "28", "30"];
   const currentMonth = new Date().toLocaleString("default", { month: "short" });
   
-  const wonLeads = leads.filter((l) => l.status === "Won");
+  const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status));
   const totalSalesVal = salesTotal ?? wonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
   const totalTargetVal = targetTotal ?? 3600000;
 
@@ -208,11 +208,11 @@ export default function Dashboard({
   const todayStr = new Date().toISOString().split("T")[0];
 
   const totalLeads = leads.length;
-  const newLeads = leads.filter((l) => l.status === "New").length;
+  const leadsAddedToday = leads.filter((lead) => lead.created === todayStr).length;
   const followupsToday = followups.filter((f) => !f.completed && f.date === todayStr).length;
   const overdueFollowups = followups.filter((f) => !f.completed && f.date < todayStr).length;
   const callsToday = calls.filter((c) => c.callDate === todayStr || c.callDate === "Today").length || calls.length;
-  const wonLeads = leads.filter((l) => l.status === "Won");
+  const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status));
   const convertedLeads = wonLeads.length;
 
   const totalAchievedSales = wonLeads.reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
@@ -221,7 +221,7 @@ export default function Dashboard({
 
   const stats = [
     ["Total leads", totalLeads, totalLeads > 0 ? `${totalLeads} active` : "No leads", Users],
-    ["New leads", newLeads, newLeads > 0 ? `${newLeads} new` : "0 new", UserPlus],
+    ["Added today", leadsAddedToday, leadsAddedToday > 0 ? `${leadsAddedToday} added` : "None added", UserPlus],
     ["Follow-ups today", followupsToday, followupsToday > 0 ? "Due today" : "None due", CalendarClock],
     ["Overdue follow-ups", overdueFollowups, overdueFollowups > 0 ? "Action needed" : "Up to date", Clock],
     ["Calls logged", callsToday, `${calls.length} total`, Phone],
@@ -292,15 +292,16 @@ export default function Dashboard({
     );
   }
 
-  const activePipelineLeads = leads.filter((l) => !["Won", "Lost"].includes(l.status));
+  const activePipelineLeads = leads.filter((l) => !closedStatuses.includes(l.status));
   const activePipelineValue = activePipelineLeads.reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
 
-  const stageCounts = [
-    { name: "New leads", status: "New", color: "#315d8c" },
-    { name: "Contacted", status: "Contacted", color: "#6085ab" },
-    { name: "Interested", status: "Interested", color: "#c29a58" },
-    { name: "Quotation", status: "Quotation", color: "#8fad9f" },
-  ].map((st) => {
+  const stageColors = { New: "#315d8c", Contacted: "#6085ab", "Follow-up": "#c29a58", Qualified: "#438a91" };
+  const activeStatuses = [...new Set([
+    ...statuses.filter((status) => !closedStatuses.includes(status)),
+    ...activePipelineLeads.map((lead) => lead.status).filter(Boolean),
+  ])];
+  const stageCounts = activeStatuses.map((status) => {
+    const st = { name: status, status, color: stageColors[status] || "#8fad9f" };
     const matches = leads.filter((l) => l.status === st.status);
     const sum = matches.reduce((acc, l) => acc + (Number(l.saleAmount) || 0), 0);
     return {

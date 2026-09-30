@@ -33,6 +33,7 @@ import {
   Download,
 } from "lucide-react";
 import Dashboard from "./dashboard";
+import CourseCombobox from "./course-combobox";
 import {
   PageHeader,
   DateRangeFilter,
@@ -67,6 +68,7 @@ import {
   notifications,
   statuses,
   sources,
+  priorities,
   money,
   courses,
   courseFees,
@@ -121,22 +123,6 @@ const navGroups = [
 const titles = Object.fromEntries(
   navGroups.flatMap((g) => g[1].map((x) => [x[0], x[1]])),
 );
-const descriptions = {
-  leads: "Every opportunity, in one place. Build relationships that grow.",
-  "my-leads": "Your opportunities. Your next great conversation.",
-  "follow-ups":
-    "Stay on top of every conversation and never miss an opportunity.",
-  pipeline:
-    "A clear view of your opportunities, from first hello to closed deal.",
-  leaderboard: "Celebrate progress. Recognize the people moving us forward.",
-  targets: "Clear goals. Measurable progress. Shared success.",
-  customers: "Build lasting relationships with every customer.",
-  calls: "Every conversation brings you closer.",
-  staff: "The people behind your progress.",
-  performance: "Understand what’s working. Find your next opportunity.",
-  users: "Manage your people and their workspace access.",
-  settings: "Make ENTRAIN CRM work for your organization.",
-};
 function WorkspaceSkeleton({ page }) {
   const tablePage = ["users", "staff", "leads", "my-leads", "follow-ups", "calls", "customers"].includes(page);
   return (
@@ -183,7 +169,6 @@ function SessionLoading({ page }) {
         <div className="session-loading-breadcrumb">Workspace <ChevronRight size={12} /> {titles[page] || "Dashboard"}</div>
         <div className="session-loading-title">
           <h1>{titles[page] || "Dashboard"}</h1>
-          <p>{descriptions[page] || "Your sales workspace."}</p>
         </div>
         <WorkspaceSkeleton page={page} />
       </main>
@@ -424,6 +409,12 @@ export default function CRMApp() {
       }
       const saleAmount = Number(data.saleAmount),
         advanceAmount = Number(data.advanceAmount);
+      const selectedCourse = courses.find((course) => course.name.toLowerCase() === String(data.service || "").trim().toLowerCase());
+      if (!selectedCourse) {
+        notify("Choose a course from the search suggestions.");
+        return;
+      }
+      data.service = selectedCourse.name;
       if (!data.assigned) {
         notify("Select a Team Lead or Sales Executive");
         return;
@@ -879,14 +870,6 @@ export default function CRMApp() {
                     ? `Good morning, ${userName.split(" ")[0]}`
                     : titles[page] || "Reports"
                 }
-                description={
-                  page === "dashboard"
-                    ? role === "HR"
-                      ? "Here’s what’s happening with your people today."
-                      : "Here’s what’s happening with your sales today."
-                    : descriptions[page] ||
-                      "Turn your data into clarity. Make every decision count."
-                }
               >
                 {page === "dashboard" ? (
                   <>
@@ -1126,35 +1109,21 @@ export default function CRMApp() {
                     {field("Phone number", "phone", "tel")}
                     {field("WhatsApp number", "whatsapp", "tel")}
                     {field("Location", "location")}
-                    <label>
-                      Interested course
-                      <select
-                        name="service"
-                        defaultValue={modal.record?.service || courses[0].name}
-                        onChange={(e) => {
-                          const amount =
-                            e.currentTarget.form.elements.namedItem(
-                              "saleAmount",
-                            );
+                    <div className="course-field">
+                      <span>Interested course</span>
+                      <CourseCombobox
+                        key={modal.record?.id || "new-lead"}
+                        courses={courses}
+                        defaultValue={modal.record?.service || ""}
+                        onSelect={(course, form) => {
+                          const amount = form?.elements.namedItem("saleAmount");
                           if (amount && !amount.dataset.edited)
-                            amount.value = String(
-                              courseFees[e.target.value] || 0,
-                            );
+                            amount.value = String(courseFees[course.name] || 0);
                         }}
-                      >
-                        {courses.map((course) => (
-                          <option key={course.name} value={course.name}>
-                            {course.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                      />
+                    </div>
                     {field("Lead source", "source", "text", sources)}
-                    {field("Priority", "priority", "text", [
-                      "Medium",
-                      "High",
-                      "Low",
-                    ])}
+                    {field("Priority", "priority", "text", priorities, modal.record?.priority || "Warm")}
                     <label>
                       Assign to Team Lead or Sales Executive
                       <select
@@ -1179,7 +1148,7 @@ export default function CRMApp() {
                           ))}
                       </select>
                     </label>
-                    {field("Status", "status", "text", statuses)}
+                    {field("Status", "status", "text", modal.record?.status && !statuses.includes(modal.record.status) ? [...statuses, modal.record.status] : statuses)}
                     <label>
                       Sale amount (₹)
                       <input
@@ -1191,7 +1160,7 @@ export default function CRMApp() {
                         defaultValue={
                           modal.record?.saleAmount ??
                           courseFees[
-                            modal.record?.service || courses[0].name
+                            modal.record?.service
                           ] ??
                           0
                         }

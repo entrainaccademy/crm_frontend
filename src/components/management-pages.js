@@ -21,7 +21,7 @@ import {
   SearchInput,
   DateRangeFilter,
 } from "./ui";
-import { rankExecutives, money, roles, access } from "@/lib/data";
+import { rankExecutives, money, roles, access, sources, statuses, priorities, convertedStatuses, closedStatuses } from "@/lib/data";
 import { SalesChart } from "./dashboard";
 export function LeaderboardPage({ people }) {
   const [period, setPeriod] = useState("This Month");
@@ -314,7 +314,7 @@ export function StaffPage({ people = [], leads = [], calls = [], followups = [],
             label: "Active leads",
             render: (r) =>
               ["Sales Executive", "Team Lead"].includes(r.role)
-                ? leads.filter((l) => l.assigned === r.name && !["Won", "Lost"].includes(l.status)).length
+                ? leads.filter((l) => l.assigned === r.name && !closedStatuses.includes(l.status)).length
                 : "—",
           },
           {
@@ -338,7 +338,7 @@ export function StaffPage({ people = [], leads = [], calls = [], followups = [],
             label: "Conversions",
             render: (r) =>
               ["Sales Executive", "Team Lead"].includes(r.role)
-                ? leads.filter((l) => l.assigned === r.name && l.status === "Won").length
+                ? leads.filter((l) => l.assigned === r.name && convertedStatuses.includes(l.status)).length
                 : "—",
           },
           {
@@ -347,7 +347,7 @@ export function StaffPage({ people = [], leads = [], calls = [], followups = [],
             render: (r) => {
               if (!["Sales Executive", "Team Lead"].includes(r.role)) return "—";
               const wonTotal = leads
-                .filter((l) => l.assigned === r.name && l.status === "Won")
+                .filter((l) => l.assigned === r.name && convertedStatuses.includes(l.status))
                 .reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
               return money(wonTotal || r.sales || 0);
             },
@@ -358,7 +358,7 @@ export function StaffPage({ people = [], leads = [], calls = [], followups = [],
             render: (r) => {
               if (r.target == null) return "—";
               const wonTotal = leads
-                .filter((l) => l.assigned === r.name && l.status === "Won")
+                .filter((l) => l.assigned === r.name && convertedStatuses.includes(l.status))
                 .reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0) || r.sales || 0;
               return `${Math.round((wonTotal / Math.max(1, r.target)) * 100)}%`;
             },
@@ -394,13 +394,13 @@ export function AnalyticsPage({
   const visiblePeople =
     page === "performance" ? (executive ? [executive] : []) : people;
 
-  const wonLeads = leads.filter((l) => l.status === "Won");
+  const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status));
   const totalSales = wonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
   const totalTarget = people.reduce((s, p) => s + (Number(p.target) || 0), 0) || 3600000;
   const achievementPct = `${Math.round((totalSales / Math.max(1, totalTarget)) * 100)}%`;
   const conversionRate = leads.length > 0 ? `${((wonLeads.length / leads.length) * 100).toFixed(1)}%` : "0%";
 
-  const execWonLeads = executive ? leads.filter((l) => l.assigned === executive.name && l.status === "Won") : [];
+  const execWonLeads = executive ? leads.filter((l) => l.assigned === executive.name && convertedStatuses.includes(l.status)) : [];
   const execSales = execWonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0) || executive?.sales || 0;
   const execTarget = executive?.target || 500000;
 
@@ -514,14 +514,7 @@ export function AnalyticsPage({
                   </div>
                 </div>
               ))
-            : [
-                "Website",
-                "Meta Ads",
-                "Referral",
-                "WhatsApp",
-                "Instagram",
-                "Facebook",
-              ].map((srcName) => {
+              : sources.map((srcName) => {
                 const count = leads.filter((l) => l.source === srcName).length;
                 const pct = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
                 return (
@@ -557,7 +550,7 @@ export function AnalyticsPage({
               label: "Sales",
               render: (r) => {
                 const won = leads
-                  .filter((l) => l.assigned === r.name && l.status === "Won")
+                  .filter((l) => l.assigned === r.name && convertedStatuses.includes(l.status))
                   .reduce((s, l) => s + (Number(l.saleAmount) || 0), 0) || r.sales || 0;
                 return money(won);
               },
@@ -568,7 +561,7 @@ export function AnalyticsPage({
               label: "Achievement",
               render: (r) => {
                 const won = leads
-                  .filter((l) => l.assigned === r.name && l.status === "Won")
+                  .filter((l) => l.assigned === r.name && convertedStatuses.includes(l.status))
                   .reduce((s, l) => s + (Number(l.saleAmount) || 0), 0) || r.sales || 0;
                 return ((won / Math.max(1, r.target || 500000)) * 100).toFixed(1) + "%";
               },
@@ -591,14 +584,14 @@ export function AnalyticsPage({
             {
               key: "conversions",
               label: "Conversions",
-              render: (r) => leads.filter((l) => l.assigned === r.name && l.status === "Won").length,
+              render: (r) => leads.filter((l) => l.assigned === r.name && convertedStatuses.includes(l.status)).length,
             },
             {
               key: "rate",
               label: "Conversion rate",
               render: (r) => {
                 const assignedCount = leads.filter((l) => l.assigned === r.name).length;
-                const wonCount = leads.filter((l) => l.assigned === r.name && l.status === "Won").length;
+                const wonCount = leads.filter((l) => l.assigned === r.name && convertedStatuses.includes(l.status)).length;
                 return assignedCount > 0 ? `${Math.round((wonCount / assignedCount) * 100)}%` : "0%";
               },
             },
@@ -825,12 +818,12 @@ export function SettingsPage({ notify }) {
                   <textarea
                     defaultValue={
                       section === "Lead Sources"
-                        ? "Meta Ads, Instagram, Facebook, Website, WhatsApp, Referral, Walk-in, Other"
+                        ? sources.join(", ")
                         : section === "Lead Statuses"
-                          ? "New, Contacted, Follow-up, Interested, Quotation, Won, Lost"
+                          ? statuses.join(", ")
                             : section === "Target Settings"
                               ? "500000"
-                              : "Default priority: Medium"
+                              : `Default priority: ${priorities[1]}`
                     }
                   />
                 </label>
