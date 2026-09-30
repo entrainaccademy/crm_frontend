@@ -152,7 +152,7 @@ export function LeaderboardPage({ people }) {
   );
 }
 export function TargetsPage({ people, setPeople, notify }) {
-  const [who, setWho] = useState(people[0].name),
+  const [who, setWho] = useState(people[0]?.name || ""),
     [amount, setAmount] = useState(500000),
     [period, setPeriod] = useState("Monthly"),
     [history, setHistory] = useState(() =>
@@ -170,6 +170,9 @@ export function TargetsPage({ people, setPeople, notify }) {
         })),
       ),
     );
+  if (!people.length) {
+    return <div className="card empty-inline">No sales executives yet. Create a Sales Executive account before assigning targets.</div>;
+  }
   return (
     <div className="two-columns">
       <section className="card detail-card">
@@ -629,7 +632,7 @@ export function AnalyticsPage({
     </>
   );
 }
-export function UsersPage({ users, setUsers, openModal }) {
+export function UsersPage({ users, setUsers, openModal, loadError = false }) {
   const [tab, setTab] = useState("Users");
   return (
     <section className="card">
@@ -644,7 +647,9 @@ export function UsersPage({ users, setUsers, openModal }) {
           </button>
         ))}
       </div>
-      {tab === "Users" ? (
+      {tab === "Users" ? loadError ? (
+        <div className="empty-inline" role="alert">Could not load accounts. Refresh the page and check the backend connection.</div>
+      ) : (
         <DataTable
           rows={users}
           columns={[

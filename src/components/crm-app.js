@@ -63,7 +63,6 @@ import {
   access,
   initialLeads,
   initialFollowups,
-  executives,
   notifications,
   statuses,
   sources,
@@ -151,16 +150,10 @@ export default function CRMApp() {
     [followups, setFollowups] = useState([]),
     [callsState, setCallsState] = useState([]),
     [tasks, setTasks] = useState([]),
-    [people, setPeople] = useState(executives),
-    [users, setUsers] = useState(
-      executives.map((p) => ({
-        ...p,
-        role: "Sales Executive",
-        email: p.short.toLowerCase() + "@entrain.in",
-        phone: "+91 98470 12345",
-        status: "Active",
-      })),
-    ),
+    [people, setPeople] = useState([]),
+    [users, setUsers] = useState([]),
+    [dataLoading, setDataLoading] = useState(true),
+    [usersError, setUsersError] = useState(false),
     [collapsed, setCollapsed] = useState(false),
     [drawer, setDrawer] = useState(false),
     [dropdown, setDropdown] = useState(""),
@@ -209,6 +202,9 @@ export default function CRMApp() {
   }, []);
   useEffect(() => {
     if (!authUser) return;
+    let cancelled = false;
+    setDataLoading(true);
+    setUsersError(false);
     async function loadData() {
       try {
         const [leadsData, followupsData, callsData, tasksData, usersData] =
@@ -219,6 +215,7 @@ export default function CRMApp() {
             api.getTasks(),
             api.getUsers(),
           ]);
+        if (cancelled) return;
 
         if (leadsData && Array.isArray(leadsData)) {
           setLeads(leadsData.map(normalizeLead));
@@ -232,7 +229,7 @@ export default function CRMApp() {
         if (tasksData && Array.isArray(tasksData)) {
           setTasks(tasksData);
         }
-        if (usersData && Array.isArray(usersData) && usersData.length > 0) {
+        if (Array.isArray(usersData)) {
           const mappedUsers = usersData.map((u) => ({
               ...u,
               id: u.id || u.customId || u._id,
@@ -240,12 +237,19 @@ export default function CRMApp() {
             }));
           setUsers(mappedUsers);
           setPeople(mappedUsers.filter((u) => u.role === "Sales Executive" && u.status === "Active"));
+        } else {
+          setUsersError(true);
         }
       } catch (err) {
+        if (cancelled) return;
         console.warn("API load error:", err);
+        setUsersError(true);
+      } finally {
+        if (!cancelled) setDataLoading(false);
       }
     }
     loadData();
+    return () => { cancelled = true; };
   }, [authUser]);
 
   const scopedNames = role === "Sales Executive" ? [authUser?.name] : null;
@@ -452,7 +456,7 @@ export default function CRMApp() {
       )}
     </label>
   );
-  if (!hydrated) return <div className="auth-loading" role="status">Loading workspace…</div>;
+  if (!hydrated || (authUser && dataLoading)) return <div className="auth-loading" role="status">Loading workspace…</div>;
   if (!authUser)
     return (
       <div className="auth-screen">
@@ -481,6 +485,7 @@ export default function CRMApp() {
                 setAuthBusy(true);
                 try {
                   const user = await api.login(values.email, values.password);
+                  setDataLoading(true);
                   setAuthUser(user);
                   setRole(user.role);
                   navigate("dashboard");
@@ -945,6 +950,7 @@ export default function CRMApp() {
             {page === "users" && (
               <UsersPage
                 users={users}
+                loadError={usersError}
                 setUsers={setUsers}
                 openModal={setModal}
               />
@@ -1178,6 +1184,11 @@ export default function CRMApp() {
             setAuthUser(null);
             setLeads([]);
             setFollowups([]);
+            setCallsState([]);
+            setTasks([]);
+            setUsers([]);
+            setPeople([]);
+            setDataLoading(true);
           }}
         />
       )}
