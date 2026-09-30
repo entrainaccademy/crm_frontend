@@ -221,7 +221,7 @@ export function TargetsPage({ people, setPeople, notify }) {
           </label>
           <label>
             Month
-            <input type="month" defaultValue="2026-09" required />
+            <input type="month" defaultValue={new Date().toISOString().slice(0, 7)} required />
           </label>
           <label>
             Target amount (₹)
