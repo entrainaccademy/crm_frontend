@@ -223,12 +223,19 @@ small {
 }
 .global-search input {
   color: #e1e5e8;
-  border: 0;
-  background: none;
-  padding: 10px 0;
+  border: none !important;
+  background: transparent !important;
+  padding: 10px 0 !important;
   width: 100%;
   font-size: 11px;
-  outline: none;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.global-search input:focus,
+.global-search input:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 .global-search kbd {
   font-size: 10px;
@@ -997,17 +1004,44 @@ td small {
 .search-input {
   display: flex;
   align-items: center;
-  gap: 7px;
-  border: 1px solid #e0e5e8;
+  gap: 8px;
+  border: 1px solid #d9e2ec;
   border-radius: 6px;
-  padding-left: 10px;
+  padding: 0 10px;
   min-width: 250px;
-  color: #96a0a8;
+  height: 36px;
+  background: #ffffff;
+  color: #8c9ba8;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.search-input:focus-within {
+  border-color: #315d8c;
+  box-shadow: 0 0 0 2px rgba(49, 93, 140, 0.2);
+}
+.search-input svg {
+  flex-shrink: 0;
+  color: #8c9ba8;
+}
+.search-input:focus-within svg {
+  color: #315d8c;
 }
 .search-input input {
-  border: 0;
-  width: 100%;
-  font-size: 11px;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
+  font-size: 12px;
+  color: #344c65;
+}
+.search-input input:focus,
+.search-input input:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 .toolbar-right {
   display: flex;
