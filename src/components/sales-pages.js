@@ -98,6 +98,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
               }}
               options={o}
               label={l}
+              allLabel={l === "Status" ? "All statuses" : undefined}
             />
           ))}
           <input

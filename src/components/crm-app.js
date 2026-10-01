@@ -319,8 +319,9 @@ export default function CRMApp() {
 
   const scopedNames = role === "Sales Executive" ? [authUser?.name] : null;
   const userName = authUser?.name || "User";
-  const readOnly = ["Super Admin", "Data Analytics Manager"].includes(role);
-  const canCreateLead = ["Data Analytics Manager", "Sales Executive"].includes(role);
+  const readOnly = role === "Super Admin";
+  const canManageAccounts = ["Super Admin", "Data Analytics Manager"].includes(role);
+  const canCreateLead = ["Data Analytics Manager", "Team Lead", "Sales Executive"].includes(role);
   const canEditLead = (lead) =>
     role === "Data Analytics Manager" ||
     (role === "Sales Executive" && lead?.assigned === userName) ||
@@ -358,7 +359,7 @@ export default function CRMApp() {
     notify("Lead deleted");
   };
   const changeUserStatus = async (account) => {
-    if (role !== "Super Admin") return;
+    if (!canManageAccounts) return;
     if (account._id === authUser?._id || account.email === authUser?.email) {
       notify("You cannot change your own account status.", "error");
       return;
@@ -454,7 +455,7 @@ export default function CRMApp() {
         notify("Select an interested course.", "error");
         return;
       }
-      if (role === "Sales Executive") data.assigned = userName;
+      if (["Team Lead", "Sales Executive"].includes(role)) data.assigned = userName;
       if (!data.assigned) {
         notify("Select a Team Lead or Sales Executive", "error");
         return;
@@ -553,7 +554,7 @@ export default function CRMApp() {
       notify(modal.record ? "Follow-up updated" : "Follow-up added");
     }
     if (modal.type === "user") {
-      if (role !== "Super Admin") { notify("Only the Super Admin can manage accounts.", "error"); return; }
+      if (!canManageAccounts) { notify("You do not have permission to manage accounts.", "error"); return; }
       const u = {
         ...modal.record,
         ...data,
@@ -806,7 +807,7 @@ export default function CRMApp() {
             >
               <UserRound size={15} /> My Profile
             </button>
-            {role === "Super Admin" && (
+            {canManageAccounts && (
               <button onClick={() => navigate("settings")}>
                 <Settings size={15} /> Settings
               </button>
@@ -963,7 +964,7 @@ export default function CRMApp() {
                   >
                     <Plus size={16} /> Add follow-up
                   </button>
-                ) : page === "users" && role === "Super Admin" ? (
+                ) : page === "users" && canManageAccounts ? (
                   <button
                     className="primary"
                     disabled={dataLoading}
@@ -1114,7 +1115,7 @@ export default function CRMApp() {
                 loadError={usersError}
                 openModal={setModal}
                 onStatusChange={changeUserStatus}
-                canManage={role === "Super Admin"}
+                canManage={canManageAccounts}
               />
             )}
             {page === "settings" && <SettingsPage notify={notify} />}
@@ -1184,7 +1185,7 @@ export default function CRMApp() {
                     </div>
                     {field("Lead source", "source", "text", modal.record?.source && !sources.includes(modal.record.source) ? [...sources, modal.record.source] : sources, modal.record?.source || "Facebook")}
                     {field("Priority", "priority", "text", modal.record?.priority && !priorities.includes(modal.record.priority) ? [...priorities, modal.record.priority] : priorities, modal.record?.priority || "Warm")}
-                    {role !== "Sales Executive" && (
+                    {!["Team Lead", "Sales Executive"].includes(role) && (
                       <label>
                         Assign to Team Lead or Sales Executive
                         <select

@@ -80,14 +80,14 @@ export function SearchInput({ value, onChange, placeholder = "Search…" }) {
     </div>
   );
 }
-export function FilterDropdown({ value, onChange, options, label }) {
+export function FilterDropdown({ value, onChange, options, label, allLabel = label }) {
   return (
     <select
       aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >
-      {label && <option value="">{label}</option>}
+      {label && <option value="">{allLabel}</option>}
       {options.map((x) => (
         <option key={x}>{x}</option>
       ))}

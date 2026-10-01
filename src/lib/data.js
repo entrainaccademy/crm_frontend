@@ -146,6 +146,7 @@ export const access = {
     "customers",
     "calls",
     "staff",
+    "tasks",
     "performance",
     "leaderboard",
     "sales-reports",
@@ -153,6 +154,7 @@ export const access = {
     "call-reports",
     "follow-up-reports",
     "users",
+    "settings",
   ],
   "Team Lead": [
     "dashboard",
