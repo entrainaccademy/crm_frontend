@@ -190,7 +190,7 @@ export function Modal({ title, children, onClose }) {
     const el = ref.current;
     el?.focus();
     const fn = (e) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !document.querySelector('[data-slot="combobox-content"][data-open]')) onClose();
       if (e.key === "Tab") {
         const list = el.querySelectorAll(
           'button,input,select,textarea,[tabindex="0"]',
@@ -240,16 +240,16 @@ export function Modal({ title, children, onClose }) {
     </div>
   );
 }
-export function ConfirmDialog({ title, onClose, onConfirm }) {
+export function ConfirmDialog({ title, message = "Are you sure you want to sign out? You can sign back in anytime.", confirmLabel = "Log out", destructive = false, onClose, onConfirm }) {
   return (
     <Modal title={title} onClose={onClose}>
       <p className="modal-copy">
-        Are you sure you want to sign out? You can sign back in anytime.
+        {message}
       </p>
       <div className="modal-footer">
         <button onClick={onClose}>Cancel</button>
-        <button className="primary" onClick={onConfirm}>
-          Log out
+        <button className={destructive ? "danger-button" : "primary"} onClick={onConfirm}>
+          {confirmLabel}
         </button>
       </div>
     </Modal>

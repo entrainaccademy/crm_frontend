@@ -20,12 +20,12 @@ import {
   ChevronDown,
   ChevronsLeft,
   Menu,
-  X,
   Plus,
   ArrowUpRight,
   LifeBuoy,
   LogOut,
   Check,
+  CircleAlert,
   Command,
   BriefcaseBusiness,
   ChevronRight,
@@ -33,6 +33,7 @@ import {
   Download,
 } from "lucide-react";
 import Dashboard from "./dashboard";
+import CourseCombobox from "./course-combobox";
 import {
   PageHeader,
   DateRangeFilter,
@@ -215,7 +216,7 @@ export default function CRMApp() {
     [search, setSearch] = useState(""),
     [period, setPeriod] = useState("This Month"),
     [modal, setModal] = useState(null),
-    [toast, setToast] = useState(""),
+    [toast, setToast] = useState(null),
     [read, setRead] = useState(false),
     [hydrated, setHydrated] = useState(false);
   const todayStr = new Date().toISOString().split("T")[0];
@@ -243,10 +244,10 @@ export default function CRMApp() {
     setDropdown("");
     setSearch("");
   };
-  const notify = (text) => setToast(text);
+  const notify = (message, type = "success") => setToast({ message, type, id: Date.now() });
   useEffect(() => {
     if (toast) {
-      const t = setTimeout(() => setToast(""), 4500);
+      const t = setTimeout(() => setToast(null), 4500);
       return () => clearTimeout(t);
     }
   }, [toast]);
@@ -321,8 +322,10 @@ export default function CRMApp() {
   const readOnly = ["Super Admin", "Data Analytics Manager"].includes(role);
   const canCreateLead = ["Data Analytics Manager", "Sales Executive"].includes(role);
   const canEditLead = (lead) =>
-    role === "Sales Executive" ||
+    role === "Data Analytics Manager" ||
+    (role === "Sales Executive" && lead?.assigned === userName) ||
     (role === "Team Lead" && lead?.assigned === userName);
+  const canDeleteLead = role === "Data Analytics Manager";
   const canAssignLead = role === "Data Analytics Manager";
   const canWorkRecord = (record) =>
     !readOnly && (role !== "Team Lead" || record?.assigned === userName);
@@ -336,16 +339,28 @@ export default function CRMApp() {
   const allowed =
     access[role].includes(page) ||
     (page === "leads" && detailId && role === "Sales Executive");
-  const updateLead = async (lead) => {
-    if (!canEditLead(lead)) { notify("You can only update your assigned leads."); return; }
+  const updateLead = async (lead, { silent = false } = {}) => {
+    if (!canEditLead(lead)) { notify("You can only update your assigned leads.", "error"); return false; }
     const saved = await api.updateLead(lead.id, lead);
-    if (!saved) { notify("Could not save lead. Please try again."); return; }
+    if (!saved) { notify("Could not save lead. Please try again.", "error"); return false; }
     setLeads((prev) => prev.map((l) => (l.id === lead.id ? normalizeLead(saved) : l)));
+    if (!silent) notify("Lead updated");
+    return true;
+  };
+  const deleteLead = async (lead) => {
+    if (!canDeleteLead || !lead) return;
+    const deleted = await api.deleteLead(lead.id);
+    if (!deleted) { notify("Could not delete lead. Please try again.", "error"); return; }
+    setLeads((prev) => prev.filter((item) => item.id !== lead.id));
+    setFollowups((prev) => prev.filter((item) => String(item.leadId) !== String(lead.customId ?? lead.id)));
+    setModal(null);
+    if (detailId === lead.id) navigate("leads");
+    notify("Lead deleted");
   };
   const changeUserStatus = async (account) => {
     if (role !== "Super Admin") return;
     if (account._id === authUser?._id || account.email === authUser?.email) {
-      notify("You cannot change your own account status.");
+      notify("You cannot change your own account status.", "error");
       return;
     }
     try {
@@ -357,12 +372,12 @@ export default function CRMApp() {
       setPeople(nextUsers.filter((user) => ["Sales Executive", "Team Lead"].includes(user.role) && user.status === "Active"));
       notify(`${account.name} ${saved.status === "Active" ? "activated" : "deactivated"}`);
     } catch (error) {
-      notify(error.message);
+      notify(error.message, "error");
     }
   };
   function exportData(rows, name, format = "csv") {
     if (!rows.length) {
-      notify("No records to export");
+      notify("No records to export", "error");
       return;
     }
     const fields = Object.keys(rows[0]).filter(
@@ -416,11 +431,11 @@ export default function CRMApp() {
     const todayStr = new Date().toISOString().split("T")[0];
     if (modal.type === "assignment") {
       if (!canAssignLead || !modal.record || !people.some((person) => person.name === data.assigned)) {
-        notify("Choose an active Team Lead or Sales Executive.");
+        notify("Choose an active Team Lead or Sales Executive.", "error");
         return;
       }
       const saved = await api.updateLead(modal.record.id, { assigned: data.assigned });
-      if (!saved) { notify("Could not assign lead. Please try again."); return; }
+      if (!saved) { notify("Could not assign lead. Please try again.", "error"); return; }
       setLeads(leads.map((lead) => lead.id === modal.record.id ? normalizeLead(saved) : lead));
       setFollowups(followups.map((followup) => followup.leadId === saved.customId ? { ...followup, assigned: data.assigned } : followup));
       notify("Lead assigned");
@@ -429,13 +444,19 @@ export default function CRMApp() {
     }
     if (modal.type === "lead") {
       if (modal.record ? !canEditLead(modal.record) : !canCreateLead) {
-        notify("You do not have permission to save this lead.");
+        notify("You do not have permission to save this lead.", "error");
         return;
       }
       const saleAmount = Number(data.saleAmount),
         advanceAmount = Number(data.advanceAmount);
+      const selectedCourse = courses.find((course) => course.name === data.service);
+      if (!selectedCourse) {
+        notify("Select an interested course.", "error");
+        return;
+      }
+      if (role === "Sales Executive") data.assigned = userName;
       if (!data.assigned) {
-        notify("Select a Team Lead or Sales Executive");
+        notify("Select a Team Lead or Sales Executive", "error");
         return;
       }
       if (
@@ -445,9 +466,11 @@ export default function CRMApp() {
         advanceAmount < 0 ||
         advanceAmount > saleAmount
       ) {
-        notify("Advance amount must be between ₹0 and the sale amount");
+        notify("Advance amount must be between ₹0 and the sale amount", "error");
         return;
       }
+      const newNote = String(data.initialNote || "").trim();
+      delete data.initialNote;
       const lead = {
         ...modal.record,
         ...data,
@@ -455,10 +478,12 @@ export default function CRMApp() {
         advanceAmount,
         id: modal.record?.id || Date.now(),
         created: modal.record?.created || todayStr,
-        date: modal.record?.date || todayStr,
-        time: "10:30",
-        notes:
-          modal.record?.notes || (data.initialNote ? [{ text: data.initialNote, author: userName }] : []),
+        date: data.date || modal.record?.date || todayStr,
+        time: data.time || modal.record?.time || "10:30",
+        notes: [
+          ...(modal.record?.notes || []),
+          ...(newNote ? [{ text: newNote, author: userName }] : []),
+        ],
         activities: modal.record?.activities || [
           { text: "Lead created for " + data.service, time: "Just now" },
           { text: "Assigned to " + data.assigned, time: "Just now" },
@@ -474,11 +499,11 @@ export default function CRMApp() {
       };
       if (modal.record) {
         const saved = await api.updateLead(lead.id, lead);
-        if (!saved) { notify("Could not save lead. Please try again."); return; }
+        if (!saved) { notify("Could not save lead. Please try again.", "error"); return; }
         setLeads(leads.map((l) => (l.id === lead.id ? normalizeLead(saved) : l)));
       } else {
         const saved = await api.createLead(lead);
-        if (!saved) { notify("Could not add lead. Please try again."); return; }
+        if (!saved) { notify("Could not add lead. Please try again.", "error"); return; }
         setLeads([normalizeLead(saved), ...leads]);
       }
       notify(modal.record ? "Lead updated" : "Lead added successfully");
@@ -486,7 +511,7 @@ export default function CRMApp() {
     if (modal.type === "followup") {
       const lead = leads.find((l) => l.id === Number(data.leadId)) || {};
       if (!lead.id || !canWorkRecord(lead) || (modal.record && !canWorkRecord(modal.record))) {
-        notify("You can only schedule follow-ups for your assigned leads.");
+        notify("You can only schedule follow-ups for your assigned leads.", "error");
         return;
       }
       const f = {
@@ -499,15 +524,15 @@ export default function CRMApp() {
       };
       if (modal.record) {
         const saved = await api.updateFollowup(f.id, f);
-        if (!saved) { notify("Could not save follow-up. Please try again."); return; }
+        if (!saved) { notify("Could not save follow-up. Please try again.", "error"); return; }
         setFollowups(followups.map((x) => (x.id === f.id ? normalizeLead(saved) : x)));
       } else {
         const saved = await api.createFollowup(f);
-        if (!saved) { notify("Could not add follow-up. Please try again."); return; }
+        if (!saved) { notify("Could not add follow-up. Please try again.", "error"); return; }
         setFollowups([normalizeLead(saved), ...followups]);
       }
       if (lead.id) {
-        await updateLead({
+        const leadUpdated = await updateLead({
           ...lead,
           date: data.date,
           time: data.time,
@@ -518,12 +543,17 @@ export default function CRMApp() {
               time: "Just now",
             },
           ],
-        });
+        }, { silent: true });
+        if (!leadUpdated) {
+          setModal(null);
+          notify("Follow-up saved, but the lead date could not be updated.", "error");
+          return;
+        }
       }
-      notify("Follow-up scheduled");
+      notify(modal.record ? "Follow-up updated" : "Follow-up added");
     }
     if (modal.type === "user") {
-      if (role !== "Super Admin") { notify("Only the Super Admin can manage accounts."); return; }
+      if (role !== "Super Admin") { notify("Only the Super Admin can manage accounts.", "error"); return; }
       const u = {
         ...modal.record,
         ...data,
@@ -539,9 +569,9 @@ export default function CRMApp() {
           : [saved, ...users];
         setUsers(nextUsers);
         setPeople(nextUsers.filter((account) => ["Sales Executive", "Team Lead"].includes(account.role) && account.status === "Active"));
-        notify("User saved");
+        notify(modal.record ? "User updated" : "User added");
       } catch (error) {
-        notify(error.message);
+        notify(error.message, "error");
         return;
       }
     }
@@ -829,7 +859,6 @@ export default function CRMApp() {
                           ? "My Customers"
                           : label}
                     </span>
-                    {id === "follow-ups" && <b>12</b>}
                     {id === "leaderboard" && <i className="nav-new" />}
                   </a>
                 ))}
@@ -988,7 +1017,9 @@ export default function CRMApp() {
                   notify={notify}
                   updateLead={updateLead}
                   navigate={navigate}
-                  readOnly={!canEditLead(scopedLeads.find((l) => l.id === detailId))}
+                  readOnly={readOnly || !canEditLead(scopedLeads.find((l) => l.id === detailId))}
+                  canEditLead={canEditLead(scopedLeads.find((l) => l.id === detailId))}
+                  canDeleteLead={canDeleteLead}
                   canAssignLead={canAssignLead}
                 />
               ) : (
@@ -1006,6 +1037,7 @@ export default function CRMApp() {
                   exportData={exportData}
                   readOnly={role === "Super Admin"}
                   canEditLead={canEditLead}
+                  canDeleteLead={canDeleteLead}
                   canAssignLead={canAssignLead}
                 />
               ))}
@@ -1092,7 +1124,7 @@ export default function CRMApp() {
           </>
         )}
       </main>
-      {modal && modal.type !== "logout" && (
+      {modal && !["logout", "delete-lead"].includes(modal.type) && (
         <Modal
           title={
             modal.type === "lead"
@@ -1135,57 +1167,55 @@ export default function CRMApp() {
                     {field("Customer name", "name")}
                     {field("Phone number", "phone", "tel")}
                     {field("WhatsApp number", "whatsapp", "tel")}
+                    {field("Email", "email", "email")}
                     {field("Location", "location")}
-                    <label>
-                      Interested course
-                      <select
-                        name="service"
-                        defaultValue={modal.record?.service || courses[0].name}
-                        onChange={(e) => {
-                          const amount =
-                            e.currentTarget.form.elements.namedItem(
-                              "saleAmount",
-                            );
+                    <div className="course-field">
+                      <span>Interested course</span>
+                      <CourseCombobox
+                        key={modal.record?.id || "new-lead"}
+                        courses={courses}
+                        defaultValue={modal.record?.service || ""}
+                        onSelect={(course, form) => {
+                          const amount = form?.elements.namedItem("saleAmount");
                           if (amount && !amount.dataset.edited)
-                            amount.value = String(
-                              courseFees[e.target.value] || 0,
-                            );
+                            amount.value = String(courseFees[course.name] || 0);
                         }}
-                      >
-                        {courses.map((course) => (
-                          <option key={course.name} value={course.name}>
-                            {course.name}
+                      />
+                    </div>
+                    {field("Lead source", "source", "text", modal.record?.source && !sources.includes(modal.record.source) ? [...sources, modal.record.source] : sources, modal.record?.source || "Facebook")}
+                    {field("Priority", "priority", "text", modal.record?.priority && !priorities.includes(modal.record.priority) ? [...priorities, modal.record.priority] : priorities, modal.record?.priority || "Warm")}
+                    {role !== "Sales Executive" && (
+                      <label>
+                        Assign to Team Lead or Sales Executive
+                        <select
+                          name="assigned"
+                          required
+                          defaultValue={
+                            modal.record?.assigned ||
+                            (assignmentNames?.length === 1 ? assignmentNames[0] : "")
+                          }
+                        >
+                          <option value="" disabled>
+                            Select a team member
                           </option>
-                        ))}
-                      </select>
-                    </label>
-                    {field("Lead source", "source", "text", sources, modal.record?.source || "Facebook")}
-                    {field("Priority", "priority", "text", priorities, modal.record?.priority || "Warm")}
-                    <label>
-                      Assign to Team Lead or Sales Executive
-                      <select
-                        name="assigned"
-                        required
-                        defaultValue={
-                          modal.record?.assigned ||
-                          (assignmentNames?.length === 1 ? assignmentNames[0] : "")
-                        }
-                      >
-                        <option value="" disabled>
-                          Select a team member
-                        </option>
-                        {people
-                          .filter(
-                            (p) => !assignmentNames || assignmentNames.includes(p.name),
-                          )
-                          .map((p) => (
-                            <option key={p.id} value={p.name}>
-                              {p.name}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                    {field("Status", "status", "text", statuses, modal.record?.status || "Contacted")}
+                          {modal.record?.assigned && !people.some((person) => person.name === modal.record.assigned) && (
+                            <option value={modal.record.assigned}>{modal.record.assigned} (inactive)</option>
+                          )}
+                          {people
+                            .filter(
+                              (p) => !assignmentNames || assignmentNames.includes(p.name),
+                            )
+                            .map((p) => (
+                              <option key={p.id} value={p.name}>
+                                {p.name}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    )}
+                    {field("Status", "status", "text", modal.record?.status && !statuses.includes(modal.record.status) ? [...statuses, modal.record.status] : statuses, modal.record?.status || "Contacted")}
+                    {field("Next follow-up", "date", "date", null, modal.record?.date || todayStr)}
+                    {field("Follow-up time", "time", "time", null, modal.record?.time || "10:30")}
                     <label>
                       Sale amount (₹)
                       <input
@@ -1197,7 +1227,7 @@ export default function CRMApp() {
                         defaultValue={
                           modal.record?.saleAmount ??
                           courseFees[
-                            modal.record?.service || courses[0].name
+                            modal.record?.service
                           ] ??
                           0
                         }
@@ -1220,7 +1250,7 @@ export default function CRMApp() {
                         defaultValue={modal.record?.advanceAmount ?? 0}
                       />
                     </label>
-                    {field("Notes", "initialNote", "textarea")}
+                    {field("Add note", "initialNote", "textarea")}
                   </>
                 )}
                 {modal.type === "followup" && (
@@ -1287,7 +1317,7 @@ export default function CRMApp() {
                     ? "Save follow-up"
                     : modal.type === "user"
                       ? modal.record ? "Save changes" : "Create user"
-                      : "Save lead"}
+                      : modal.record ? "Save changes" : "Save lead"}
                   <Check size={15} />
                 </button>
               </div>
@@ -1335,16 +1365,20 @@ export default function CRMApp() {
           }}
         />
       )}
+      {modal?.type === "delete-lead" && (
+        <ConfirmDialog
+          title={`Delete ${modal.record?.name}?`}
+          message="This will permanently remove the lead and its follow-ups."
+          confirmLabel="Delete lead"
+          destructive
+          onClose={() => setModal(null)}
+          onConfirm={() => deleteLead(modal.record)}
+        />
+      )}
       {toast && (
-        <div className="toast" role="status">
-          <Check size={17} />
-          {toast}
-          <button
-            aria-label="Dismiss notification"
-            onClick={() => setToast("")}
-          >
-            <X size={14} />
-          </button>
+        <div key={toast.id} className={`toast toast-${toast.type}`} role={toast.type === "error" ? "alert" : "status"}>
+          {toast.type === "error" ? <CircleAlert size={17} /> : <Check size={17} />}
+          <span>{toast.message}</span>
         </div>
       )}
     </div>

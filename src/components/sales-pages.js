@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Phone,
   MessageCircle,
-  MoreHorizontal,
   ArrowLeft,
   Mail,
   MapPin,
@@ -17,6 +16,8 @@ import {
   Play,
   Check,
   GripVertical,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   DataTable,
@@ -29,7 +30,7 @@ import {
   EmptyState,
 } from "./ui";
 import { statuses, sources, priorities, closedStatuses, calls, money } from "@/lib/data";
-export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = false, canEditLead = () => true, canAssignLead = false }) {
+export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = false, canEditLead = () => true, canDeleteLead = false, canAssignLead = false }) {
   const [search, setSearch] = useState(""),
     [filters, setFilters] = useState(false),
     [status, setStatus] = useState(""),
@@ -148,21 +149,25 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
           },
           { key: "date", label: "Next follow-up" },
           { key: "created", label: "Created date" },
-          (!readOnly || canAssignLead) && {
+          (!readOnly || canAssignLead || canDeleteLead) && {
             key: "actions",
-            label: "",
-            render: (r) => (canEditLead(r) || canAssignLead) ? (
-              <button
-                aria-label={(canEditLead(r) ? "Edit " : "Assign ") + r.name}
-                className="icon-button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openModal({ type: canEditLead(r) ? "lead" : "assignment", record: r });
-                }}
-              >
-                <MoreHorizontal size={17} />
-              </button>
-            ) : null,
+            label: "Actions",
+            render: (r) => (
+              <div className="row-actions">
+                {canEditLead(r) && <button className="lead-action-icon" aria-label={`Edit ${r.name}`} title="Edit lead" onClick={(event) => {
+                  event.stopPropagation();
+                  openModal({ type: "lead", record: r });
+                }}><Pencil size={16} aria-hidden="true" /></button>}
+                {!canEditLead(r) && canAssignLead && <button onClick={(event) => {
+                  event.stopPropagation();
+                  openModal({ type: "assignment", record: r });
+                }}>Assign</button>}
+                {canDeleteLead && <button className="danger-button lead-action-icon" aria-label={`Delete ${r.name}`} title="Delete lead" onClick={(event) => {
+                  event.stopPropagation();
+                  openModal({ type: "delete-lead", record: r });
+                }}><Trash2 size={16} aria-hidden="true" /></button>}
+              </div>
+            ),
           },
         ].filter(Boolean)}
       />
@@ -194,7 +199,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
     </section>
   );
 }
-export function LeadDetails({ lead, openModal, notify, updateLead, navigate, readOnly = false, canAssignLead = false }) {
+export function LeadDetails({ lead, openModal, notify, updateLead, navigate, readOnly = false, canEditLead = false, canDeleteLead = false, canAssignLead = false }) {
   const [note, setNote] = useState("");
   if (!lead) return <EmptyState title="Lead not found" />;
   const info = (title, fields) => (
@@ -232,6 +237,8 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
             Assign lead
           </button>
         )}
+        {canEditLead && <button onClick={() => openModal({ type: "lead", record: lead })}>Edit lead</button>}
+        {canDeleteLead && <button className="danger-button" onClick={() => openModal({ type: "delete-lead", record: lead })}>Delete lead</button>}
         {!readOnly && <div className="toolbar-right">
           <button
             onClick={() =>
@@ -248,9 +255,6 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
             }
           >
             <MessageCircle size={15} /> WhatsApp
-          </button>
-          <button onClick={() => openModal({ type: "lead", record: lead })}>
-            Edit lead
           </button>
           <button
             className="primary"
@@ -302,10 +306,10 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
               </div>
             ))}
             {!readOnly && <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
                 if (note.trim()) {
-                  updateLead({
+                  const saved = await updateLead({
                     ...lead,
                     notes: [...lead.notes, { text: note, author: "User" }],
                     activities: [
@@ -313,7 +317,7 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
                       { text: "Note added: " + note, time: "Just now" },
                     ],
                   });
-                  setNote("");
+                  if (saved) setNote("");
                 }
               }}
             >

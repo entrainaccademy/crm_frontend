@@ -1155,6 +1155,26 @@ td small {
   font-size: 9px;
   padding: 6px 8px;
 }
+.row-actions .lead-action-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.row-actions .lead-action-icon:hover {
+  background: #edf2f8;
+}
+.row-actions .lead-action-icon.danger-button:hover {
+  background: #fff4f4;
+}
+.danger-button {
+  border-color: #ebc8c8;
+  color: #a33d3d;
+}
+.danger-button:hover {
+  background: #fff4f4;
+}
 .back-button {
   margin-bottom: 18px;
 }
@@ -1542,13 +1562,6 @@ dd {
   box-shadow: 0 8px 30px #192d3322;
   border-radius: 8px;
   font-size: 12px;
-}
-.toast button {
-  padding: 1px;
-  border: 0;
-  color: white;
-  background: transparent;
-  margin-left: 10px;
 }
 .nav-dropdown,
 .search-results {
@@ -3284,6 +3297,9 @@ textarea {
 .toast {
   background: #203b59;
 }
+.toast-error {
+  background: #8f3442;
+}
 @media (max-width: 760px) {
   .global-search:focus-within {
     background: #20334c;
@@ -3655,6 +3671,56 @@ textarea {
 .account-form .form-grid label { color: #425b75; font-size: 12px; font-weight: 650; }
 .account-form .form-grid input,
 .account-form .form-grid select { width: 100%; min-height: 42px; border-radius: 8px; background: #fff; font-size: 13px; font-weight: 400; }
+
+.course-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  color: #71818a;
+  font-size: 14px;
+}
+.course-combobox [data-slot="input-group"] {
+  min-height: 42px;
+  border: 1px solid #d5e0ec;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: none;
+}
+.course-combobox [data-slot="input-group"]:focus-within {
+  border-color: #d5e0ec;
+  outline: 2px solid #315d8c;
+  outline-offset: 3px;
+  box-shadow: none;
+}
+.course-combobox [data-slot="input-group-control"] {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+}
+.course-combobox [data-slot="input-group-control"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.course-combobox-menu {
+  border: 0;
+  outline: none;
+  background: #fff;
+  color: #233d59;
+  box-shadow: 0 12px 30px #13263526;
+}
+.course-combobox-menu [data-slot="combobox-item"] {
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.course-combobox-menu [data-slot="combobox-item"]:hover,
+.course-combobox-menu [data-slot="combobox-item"][data-highlighted] {
+  background: #edf3f9;
+  color: #214c78;
+}
 @media (max-width: 800px) {
   .auth-shell { grid-template-columns: 1fr; width: min(100%, 520px); }
   .auth-story { display: none; }
