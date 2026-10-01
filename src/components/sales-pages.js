@@ -294,7 +294,7 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
         </div>
         <div>
           {info("Follow-up information", [
-            ["Next follow-up", lead.date + " · " + lead.time],
+            ["Next follow-up", lead.date ? lead.date + " · " + (lead.time || "") : "Not scheduled"],
             ["Reason", "Discuss course admission"],
             ["Assigned person", lead.assigned],
           ])}
@@ -345,17 +345,21 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
 }
 export function FollowupsPage({
   followups = [],
-  setFollowups,
+  onComplete,
+  onDelete,
   openModal,
   navigate,
   notify,
   readOnly = false,
   canWorkRecord = () => true,
 }) {
-  const [tab, setTab] = useState("Today");
+  const [tab, setTab] = useState("All");
+  const [pendingId, setPendingId] = useState(null);
   const todayStr = new Date().toISOString().split("T")[0];
   const rows = followups.filter((f) =>
-    tab === "Completed"
+    tab === "All"
+      ? true
+      : tab === "Completed"
       ? f.completed
       : !f.completed &&
         (tab === "Today"
@@ -367,7 +371,7 @@ export function FollowupsPage({
   return (
     <section className="card">
       <div className="tabs">
-        {["Today", "Upcoming", "Overdue", "Completed"].map((t) => (
+        {["All", "Today", "Upcoming", "Overdue", "Completed"].map((t) => (
           <button
             key={t}
             className={tab === t ? "active" : ""}
@@ -398,7 +402,7 @@ export function FollowupsPage({
                 status={
                   r.completed
                     ? "Completed"
-                    : tab === "Overdue"
+                    : r.date && r.date < todayStr
                       ? "Overdue"
                       : "Scheduled"
                 }
@@ -423,25 +427,27 @@ export function FollowupsPage({
                 >
                   <Phone size={14} />
                 </button>}
-                {!readOnly && canWorkRecord(r) && !r.completed && (
+                {!readOnly && canWorkRecord(r) && (
                   <>
                     <button
-                      onClick={() =>
-                        setFollowups(
-                          followups.map((f) =>
-                            f.id === r.id ? { ...f, completed: true } : f,
-                          ),
-                        )
-                      }
+                      disabled={pendingId === r.id}
+                      onClick={async () => {
+                        setPendingId(r.id);
+                        try { await onComplete(r); }
+                        finally { setPendingId(null); }
+                      }}
                     >
-                      Complete
+                      {r.completed ? "Reopen" : "Complete"}
                     </button>
-                    <button
-                      onClick={() => openModal({ type: "followup", record: r })}
-                    >
-                      Reschedule
-                    </button>
+                    {!r.completed && (
+                      <button onClick={() => openModal({ type: "followup", record: r })}>
+                        Reschedule
+                      </button>
+                    )}
                   </>
+                )}
+                {!readOnly && canWorkRecord(r) && (
+                  <button className="danger-button" onClick={() => onDelete(r)}>Delete</button>
                 )}
               </div>
             ),

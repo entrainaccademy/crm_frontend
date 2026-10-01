@@ -92,6 +92,12 @@ export const normalizeLead = (lead) => {
   };
 };
 
+export const normalizeFollowup = (followup) => ({
+  ...followup,
+  id: followup._id || followup.id,
+  notes: typeof followup.notes === "string" ? followup.notes : "",
+});
+
 // Clean initial empty datasets (no dummy data)
 export const initialLeads = [];
 export const initialFollowups = [];

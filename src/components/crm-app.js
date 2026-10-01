@@ -73,6 +73,7 @@ import {
   courses,
   courseFees,
   normalizeLead,
+  normalizeFollowup,
 } from "@/lib/data";
 import { api } from "@/lib/api";
 const navGroups = [
@@ -286,7 +287,7 @@ export default function CRMApp() {
           setLeads(leadsData.map(normalizeLead));
         }
         if (followupsData && Array.isArray(followupsData)) {
-          setFollowups(followupsData.map(normalizeLead));
+          setFollowups(followupsData.map(normalizeFollowup));
         }
         if (callsData && Array.isArray(callsData)) {
           setCallsState(callsData);
@@ -357,6 +358,29 @@ export default function CRMApp() {
     setModal(null);
     if (detailId === lead.id) navigate("leads");
     notify("Lead deleted");
+  };
+  const refreshLeadSchedule = async (leadId) => {
+    const updated = await api.getLead(leadId);
+    if (updated) {
+      setLeads((prev) => prev.map((lead) => String(lead.id) === String(leadId) ? normalizeLead(updated) : lead));
+    }
+  };
+  const completeFollowup = async (followup) => {
+    if (readOnly || !canWorkRecord(followup)) return;
+    const saved = await api.toggleFollowup(followup._id || followup.id);
+    if (!saved) { notify("Could not complete follow-up. Please try again.", "error"); return; }
+    setFollowups((prev) => prev.map((item) => item._id === saved._id ? normalizeFollowup(saved) : item));
+    await refreshLeadSchedule(saved.leadId);
+    notify(saved.completed ? "Follow-up completed" : "Follow-up reopened");
+  };
+  const deleteFollowup = async (followup) => {
+    if (readOnly || !canWorkRecord(followup)) return;
+    const deleted = await api.deleteFollowup(followup._id || followup.id);
+    if (!deleted) { notify("Could not delete follow-up. Please try again.", "error"); return; }
+    setFollowups((prev) => prev.filter((item) => item._id !== followup._id));
+    await refreshLeadSchedule(followup.leadId);
+    setModal(null);
+    notify("Follow-up deleted");
   };
   const changeUserStatus = async (account) => {
     if (!canManageAccounts) return;
@@ -510,47 +534,38 @@ export default function CRMApp() {
       notify(modal.record ? "Lead updated" : "Lead added successfully");
     }
     if (modal.type === "followup") {
-      const lead = leads.find((l) => l.id === Number(data.leadId)) || {};
+      const lead = leads.find((l) => String(l.id) === String(data.leadId)) || {};
       if (!lead.id || !canWorkRecord(lead) || (modal.record && !canWorkRecord(modal.record))) {
         notify("You can only schedule follow-ups for your assigned leads.", "error");
         return;
       }
       const f = {
-        ...lead,
-        ...data,
-        id: modal.record?.id || Date.now(),
-        leadId: lead.id || data.leadId,
-        completed: false,
-        purpose: data.notes || "Follow up with customer",
+        leadId: Number(lead.customId ?? lead.id),
+        name: lead.name,
+        phone: lead.phone,
+        whatsapp: lead.whatsapp,
+        email: lead.email,
+        location: lead.location,
+        service: lead.service,
+        source: lead.source,
+        assigned: lead.assigned,
+        priority: lead.priority,
+        date: data.date,
+        time: data.time,
+        type: data.type,
+        notes: data.notes,
+        purpose: data.notes?.trim() || modal.record?.purpose || "Follow up with customer",
       };
       if (modal.record) {
-        const saved = await api.updateFollowup(f.id, f);
+        const saved = await api.updateFollowup(modal.record._id || modal.record.id, f);
         if (!saved) { notify("Could not save follow-up. Please try again.", "error"); return; }
-        setFollowups(followups.map((x) => (x.id === f.id ? normalizeLead(saved) : x)));
+        setFollowups((prev) => prev.map((item) => item._id === saved._id ? normalizeFollowup(saved) : item));
       } else {
         const saved = await api.createFollowup(f);
         if (!saved) { notify("Could not add follow-up. Please try again.", "error"); return; }
-        setFollowups([normalizeLead(saved), ...followups]);
+        setFollowups((prev) => [normalizeFollowup(saved), ...prev]);
       }
-      if (lead.id) {
-        const leadUpdated = await updateLead({
-          ...lead,
-          date: data.date,
-          time: data.time,
-          activities: [
-            ...(lead.activities || []),
-            {
-              text: "Follow-up scheduled for " + data.date + " at " + data.time,
-              time: "Just now",
-            },
-          ],
-        }, { silent: true });
-        if (!leadUpdated) {
-          setModal(null);
-          notify("Follow-up saved, but the lead date could not be updated.", "error");
-          return;
-        }
-      }
+      await refreshLeadSchedule(lead.id);
       notify(modal.record ? "Follow-up updated" : "Follow-up added");
     }
     if (modal.type === "user") {
@@ -1045,14 +1060,8 @@ export default function CRMApp() {
             {page === "follow-ups" && (
               <FollowupsPage
                 followups={scopedFollowups}
-                setFollowups={(next) =>
-                  setFollowups([
-                    ...followups.filter(
-                      (f) => !scopedFollowups.some((s) => s.id === f.id),
-                    ),
-                    ...next,
-                  ])
-                }
+                onComplete={completeFollowup}
+                onDelete={(followup) => setModal({ type: "delete-followup", record: followup })}
                 openModal={setModal}
                 navigate={navigate}
                 notify={notify}
@@ -1125,7 +1134,7 @@ export default function CRMApp() {
           </>
         )}
       </main>
-      {modal && !["logout", "delete-lead"].includes(modal.type) && (
+      {modal && !["logout", "delete-lead", "delete-followup"].includes(modal.type) && (
         <Modal
           title={
             modal.type === "lead"
@@ -1374,6 +1383,16 @@ export default function CRMApp() {
           destructive
           onClose={() => setModal(null)}
           onConfirm={() => deleteLead(modal.record)}
+        />
+      )}
+      {modal?.type === "delete-followup" && (
+        <ConfirmDialog
+          title={`Delete follow-up for ${modal.record?.name}?`}
+          message="This follow-up will be permanently removed."
+          confirmLabel="Delete follow-up"
+          destructive
+          onClose={() => setModal(null)}
+          onConfirm={() => deleteFollowup(modal.record)}
         />
       )}
       {toast && (

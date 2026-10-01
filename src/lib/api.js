@@ -54,6 +54,10 @@ export const api = {
     const res = await request(`/leads${query ? `?${query}` : ""}`);
     return res.success ? res.data : null;
   },
+  async getLead(id) {
+    const res = await request(`/leads/${id}`);
+    return res.success ? res.data : null;
+  },
   async createLead(data) {
     const res = await request("/leads", {
       method: "POST",
@@ -90,6 +94,10 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(data),
     });
+    return res.success ? res.data : null;
+  },
+  async toggleFollowup(id) {
+    const res = await request(`/followups/${id}/toggle`, { method: "PATCH" });
     return res.success ? res.data : null;
   },
   async deleteFollowup(id) {
