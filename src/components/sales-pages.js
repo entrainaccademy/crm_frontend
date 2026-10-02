@@ -43,10 +43,10 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
   const rows = leads.filter(
     (l) =>
       (l.name + l.phone).toLowerCase().includes(search.toLowerCase()) &&
-      (!status || l.status === status) &&
+      (!status || (status === "No status" ? !l.status : l.status === status)) &&
       (!source || l.source === source) &&
       (!assigned || l.assigned === assigned) &&
-      (!priority || l.priority === priority) &&
+      (!priority || (priority === "No priority" ? !l.priority : l.priority === priority)) &&
       (!service || l.service === service) &&
       (!date || l.created === date),
   );
@@ -73,7 +73,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
       {filters && (
         <div className="filter-row">
           {[
-            [status, setStatus, [...new Set([...statuses, ...leads.map((lead) => lead.status).filter(Boolean)])], "Status"],
+            [status, setStatus, [...new Set(["No status", ...statuses, ...leads.map((lead) => lead.status).filter(Boolean)])], "Status"],
             [
               assigned,
               setAssigned,
@@ -81,7 +81,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
               "Salesperson",
             ],
             [source, setSource, [...new Set([...sources, ...leads.map((lead) => lead.source).filter(Boolean)])], "Source"],
-            [priority, setPriority, [...new Set([...priorities, ...leads.map((lead) => lead.priority).filter(Boolean)])], "Priority"],
+            [priority, setPriority, [...new Set(["No priority", ...priorities, ...leads.map((lead) => lead.priority).filter(Boolean)])], "Priority"],
             [
               service,
               setService,
@@ -148,7 +148,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
             label: "Status",
             render: (r) => <StatusBadge status={r.status} />,
           },
-          { key: "date", label: "Next follow-up" },
+          { key: "date", label: "Next follow-up", render: (r) => r.date || "Not scheduled" },
           { key: "created", label: "Created date" },
           (!readOnly || canAssignLead || canDeleteLead) && {
             key: "actions",
@@ -277,7 +277,7 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
           {info("Lead information", [
             ["Lead source", lead.source],
             ["Course", lead.service],
-            ["Priority", lead.priority],
+            ["Priority", lead.priority || "No priority"],
             ["Assigned to", lead.assigned],
             ["Created", lead.created],
           ])}
@@ -483,8 +483,8 @@ export function LeadCard({ lead, navigate, onMove, onDragComplete, readOnly = fa
       }}
     >
       <div className="kanban-card-top">
-        <span className={`priority priority-${lead.priority.toLowerCase()}`}>
-          {lead.priority} priority
+        <span className={`priority priority-${(lead.priority || "none").toLowerCase()}`}>
+          {lead.priority ? `${lead.priority} priority` : "No priority"}
         </span>
         <span className="kanban-source">{lead.source}</span>
       </div>
@@ -508,10 +508,10 @@ export function LeadCard({ lead, navigate, onMove, onDragComplete, readOnly = fa
       <div className="kanban-card-footer">
         <span>
           <CalendarClock size={14} />
-          {new Date(lead.date + "T00:00:00").toLocaleDateString("en-IN", {
+          {lead.date ? new Date(lead.date + "T00:00:00").toLocaleDateString("en-IN", {
             day: "numeric",
             month: "short",
-          })}
+          }) : "Not scheduled"}
         </span>
         <select
           aria-label={"Move " + lead.name + " to stage"}
@@ -519,7 +519,8 @@ export function LeadCard({ lead, navigate, onMove, onDragComplete, readOnly = fa
           disabled={readOnly}
           onChange={(e) => onMove(lead, e.target.value)}
         >
-          {[...statuses, ...(!statuses.includes(lead.status) ? [lead.status] : [])].map((stage) => (
+          <option value="">No status</option>
+          {[...statuses, ...(lead.status && !statuses.includes(lead.status) ? [lead.status] : [])].map((stage) => (
             <option key={stage}>{stage}</option>
           ))}
         </select>
@@ -541,7 +542,7 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false, ca
       (!owner || lead.assigned === owner) &&
       (!course || lead.service === course),
   );
-  const pipelineStatuses = [...new Set([...statuses, ...leads.map((lead) => lead.status).filter(Boolean)])];
+  const pipelineStatuses = [...new Set([...(leads.some((lead) => !lead.status) ? [""] : []), ...statuses, ...leads.map((lead) => lead.status).filter(Boolean)])];
   const moveLead = (lead, status) => {
     if (readOnly || !canEditLead(lead)) return;
     if (lead.status === status) return;
@@ -598,7 +599,7 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false, ca
         tabIndex={0}
       >
         {pipelineStatuses.map((status) => {
-          const stageLeads = filtered.filter((lead) => lead.status === status);
+          const stageLeads = filtered.filter((lead) => (lead.status || "") === status);
           return (
             <section
               className={`kanban-column ${dragOver === status ? "drag-over" : ""}`}
@@ -625,7 +626,7 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false, ca
               <div className="kanban-column-header">
                 <div>
                   <span className="stage-dot" />
-                  <h3>{status}</h3>
+                  <h3>{status || "No status"}</h3>
                   <span className="stage-count">{stageLeads.length}</span>
                 </div>
                 <p>

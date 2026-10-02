@@ -297,12 +297,13 @@ export default function Dashboard({
 
   const stageColors = { New: "#315d8c", Contacted: "#6085ab", "Follow-up": "#c29a58", Qualified: "#438a91" };
   const activeStatuses = [...new Set([
+    ...(activePipelineLeads.some((lead) => !lead.status) ? [""] : []),
     ...statuses.filter((status) => !closedStatuses.includes(status)),
     ...activePipelineLeads.map((lead) => lead.status).filter(Boolean),
   ])];
   const stageCounts = activeStatuses.map((status) => {
-    const st = { name: status, status, color: stageColors[status] || "#8fad9f" };
-    const matches = leads.filter((l) => l.status === st.status);
+    const st = { name: status || "No status", status, color: stageColors[status] || "#8fad9f" };
+    const matches = leads.filter((l) => (l.status || "") === st.status);
     const sum = matches.reduce((acc, l) => acc + (Number(l.saleAmount) || 0), 0);
     return {
       name: st.name,

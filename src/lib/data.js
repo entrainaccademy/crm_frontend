@@ -43,7 +43,7 @@ export const sources = [
   "Referral",
 ];
 
-export const priorities = ["Cold", "Warm", "Hot"];
+export const priorities = ["Cool", "Hot", "Cold"];
 export const convertedStatuses = ["Won", "Converted"];
 export const closedStatuses = [...convertedStatuses, "Not Qualified", "Lost"];
 

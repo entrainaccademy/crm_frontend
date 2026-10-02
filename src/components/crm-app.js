@@ -317,6 +317,16 @@ export default function CRMApp() {
     loadData();
     return () => { cancelled = true; };
   }, [authUser]);
+  useEffect(() => {
+    if (!authUser || page !== "follow-ups" || dataLoading) return;
+    let cancelled = false;
+    api.getFollowups().then((items) => {
+      if (!cancelled && Array.isArray(items)) {
+        setFollowups(items.map(normalizeFollowup));
+      }
+    });
+    return () => { cancelled = true; };
+  }, [authUser, page, dataLoading]);
 
   const scopedNames = role === "Sales Executive" ? [authUser?.name] : null;
   const userName = authUser?.name || "User";
@@ -499,12 +509,14 @@ export default function CRMApp() {
       const lead = {
         ...modal.record,
         ...data,
+        status: role === "Data Analytics Manager" && !modal.record ? "" : data.status,
+        priority: role === "Data Analytics Manager" && !modal.record ? "" : data.priority,
         saleAmount,
         advanceAmount,
         id: modal.record?.id || Date.now(),
         created: modal.record?.created || todayStr,
-        date: data.date || modal.record?.date || todayStr,
-        time: data.time || modal.record?.time || "10:30",
+        date: role === "Data Analytics Manager" && !modal.record ? "" : (data.date ?? modal.record?.date ?? todayStr),
+        time: role === "Data Analytics Manager" && !modal.record ? "" : (data.time ?? modal.record?.time ?? "10:30"),
         notes: [
           ...(modal.record?.notes || []),
           ...(newNote ? [{ text: newNote, author: userName }] : []),
@@ -530,6 +542,10 @@ export default function CRMApp() {
         const saved = await api.createLead(lead);
         if (!saved) { notify("Could not add lead. Please try again.", "error"); return; }
         setLeads([normalizeLead(saved), ...leads]);
+      }
+      const updatedFollowups = await api.getFollowups();
+      if (Array.isArray(updatedFollowups)) {
+        setFollowups(updatedFollowups.map(normalizeFollowup));
       }
       notify(modal.record ? "Lead updated" : "Lead added successfully");
     }
@@ -1193,7 +1209,18 @@ export default function CRMApp() {
                       />
                     </div>
                     {field("Lead source", "source", "text", modal.record?.source && !sources.includes(modal.record.source) ? [...sources, modal.record.source] : sources, modal.record?.source || "Facebook")}
-                    {field("Priority", "priority", "text", modal.record?.priority && !priorities.includes(modal.record.priority) ? [...priorities, modal.record.priority] : priorities, modal.record?.priority || "Warm")}
+                    {(role !== "Data Analytics Manager" || modal.record) && (
+                      <label>
+                        Priority
+                        <select name="priority" defaultValue={modal.record?.priority ?? "Cool"}>
+                          <option value="">No priority</option>
+                          {priorities.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+                          {modal.record?.priority && !priorities.includes(modal.record.priority) && (
+                            <option value={modal.record.priority}>{modal.record.priority}</option>
+                          )}
+                        </select>
+                      </label>
+                    )}
                     {!["Team Lead", "Sales Executive"].includes(role) && (
                       <label>
                         Assign to Team Lead or Sales Executive
@@ -1223,9 +1250,30 @@ export default function CRMApp() {
                         </select>
                       </label>
                     )}
-                    {field("Status", "status", "text", modal.record?.status && !statuses.includes(modal.record.status) ? [...statuses, modal.record.status] : statuses, modal.record?.status || "Contacted")}
-                    {field("Next follow-up", "date", "date", null, modal.record?.date || todayStr)}
-                    {field("Follow-up time", "time", "time", null, modal.record?.time || "10:30")}
+                    {(role !== "Data Analytics Manager" || modal.record) && (
+                      <label>
+                        Status
+                        <select name="status" defaultValue={modal.record?.status ?? ""}>
+                          <option value="">No status</option>
+                          {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                          {modal.record?.status && !statuses.includes(modal.record.status) && (
+                            <option value={modal.record.status}>{modal.record.status}</option>
+                          )}
+                        </select>
+                      </label>
+                    )}
+                    {(role !== "Data Analytics Manager" || modal.record) && (
+                      <>
+                        <label>
+                          Next follow-up
+                          <input name="date" type="date" defaultValue={modal.record?.date ?? todayStr} />
+                        </label>
+                        <label>
+                          Follow-up time
+                          <input name="time" type="time" defaultValue={modal.record?.time ?? "10:30"} />
+                        </label>
+                      </>
+                    )}
                     <label>
                       Sale amount (₹)
                       <input

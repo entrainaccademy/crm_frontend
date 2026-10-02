@@ -1097,6 +1097,10 @@ td small {
   background: #edf2fa;
   color: #6081ae;
 }
+.badge-no-status {
+  background: #eef1f5;
+  color: #66778b;
+}
 .badge-follow-up,
 .badge-scheduled,
 .badge-quotation,

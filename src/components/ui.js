@@ -14,12 +14,13 @@ export function UserAvatar({ name = "Shamil", size = "", index = 0 }) {
   );
 }
 export function StatusBadge({ status }) {
+  const label = status || "No status";
   return (
     <span
-      className={`badge badge-${status.toLowerCase().replaceAll(" ", "-")}`}
+      className={`badge badge-${label.toLowerCase().replaceAll(" ", "-")}`}
     >
       <i />
-      {status}
+      {label}
     </span>
   );
 }
