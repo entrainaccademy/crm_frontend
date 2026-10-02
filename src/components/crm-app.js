@@ -9,7 +9,6 @@ import {
   Columns3,
   Trophy,
   Target,
-  ContactRound,
   Phone,
   ChartNoAxesCombined,
   FileChartColumn,
@@ -18,11 +17,9 @@ import {
   Search,
   Bell,
   ChevronDown,
-  ChevronsLeft,
   Menu,
   Plus,
   ArrowUpRight,
-  LifeBuoy,
   LogOut,
   Check,
   CircleAlert,
@@ -30,6 +27,7 @@ import {
   BriefcaseBusiness,
   ChevronRight,
   PanelLeftClose,
+  PanelLeftOpen,
   Download,
 } from "lucide-react";
 import Dashboard from "./dashboard";
@@ -92,7 +90,6 @@ const navGroups = [
     [
       ["leaderboard", "Leaderboard", Trophy],
       ["targets", "Targets", Target],
-      ["customers", "Customers", ContactRound],
       ["calls", "Calls", Phone],
     ],
   ],
@@ -208,6 +205,7 @@ export default function CRMApp() {
     [callsState, setCallsState] = useState([]),
     [tasks, setTasks] = useState([]),
     [people, setPeople] = useState([]),
+    [leaderboardPeople, setLeaderboardPeople] = useState([]),
     [users, setUsers] = useState([]),
     [dataLoading, setDataLoading] = useState(true),
     [usersError, setUsersError] = useState(false),
@@ -222,13 +220,6 @@ export default function CRMApp() {
     [hydrated, setHydrated] = useState(false);
   const todayStr = new Date().toISOString().split("T")[0];
   const currentMonthYearStr = new Date().toLocaleString("en-US", { month: "long", year: "numeric" });
-  const currentMonthRangeStr = (() => {
-    const now = new Date();
-    const month = now.toLocaleString("en-US", { month: "short" });
-    const year = now.getFullYear();
-    const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
-    return `${month} 1 – ${month} ${lastDay}, ${year}`;
-  })();
   useEffect(() => {
     const handle = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -273,13 +264,18 @@ export default function CRMApp() {
     setUsersError(false);
     async function loadData() {
       try {
-        const [leadsData, followupsData, callsData, tasksData, usersData] =
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+        const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+        const [leadsData, followupsData, callsData, tasksData, usersData, leaderboardData] =
           await Promise.all([
             api.getLeads(),
             api.getFollowups(),
             api.getCalls(),
             api.getTasks(),
             api.getUsers(),
+            api.getLeaderboard({ startDate: dateKey(monthStart), endDate: dateKey(monthEnd) }),
           ]);
         if (cancelled) return;
 
@@ -294,6 +290,9 @@ export default function CRMApp() {
         }
         if (tasksData && Array.isArray(tasksData)) {
           setTasks(tasksData);
+        }
+        if (Array.isArray(leaderboardData)) {
+          setLeaderboardPeople(leaderboardData);
         }
         if (Array.isArray(usersData)) {
           const mappedUsers = usersData.map((u) => ({
@@ -351,11 +350,20 @@ export default function CRMApp() {
   const allowed =
     access[role].includes(page) ||
     (page === "leads" && detailId && role === "Sales Executive");
+  const refreshLeaderboard = async () => {
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+    const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const updated = await api.getLeaderboard({ startDate: dateKey(monthStart), endDate: dateKey(monthEnd) });
+    if (Array.isArray(updated)) setLeaderboardPeople(updated);
+  };
   const updateLead = async (lead, { silent = false } = {}) => {
     if (!canEditLead(lead)) { notify("You can only update your assigned leads.", "error"); return false; }
     const saved = await api.updateLead(lead.id, lead);
     if (!saved) { notify("Could not save lead. Please try again.", "error"); return false; }
     setLeads((prev) => prev.map((l) => (l.id === lead.id ? normalizeLead(saved) : l)));
+    await refreshLeaderboard();
     if (!silent) notify("Lead updated");
     return true;
   };
@@ -365,6 +373,7 @@ export default function CRMApp() {
     if (!deleted) { notify("Could not delete lead. Please try again.", "error"); return; }
     setLeads((prev) => prev.filter((item) => item.id !== lead.id));
     setFollowups((prev) => prev.filter((item) => String(item.leadId) !== String(lead.customId ?? lead.id)));
+    await refreshLeaderboard();
     setModal(null);
     if (detailId === lead.id) navigate("leads");
     notify("Lead deleted");
@@ -405,9 +414,25 @@ export default function CRMApp() {
       const nextUsers = users.map((user) => user.id === account.id ? saved : user);
       setUsers(nextUsers);
       setPeople(nextUsers.filter((user) => ["Sales Executive", "Team Lead"].includes(user.role) && user.status === "Active"));
+      await refreshLeaderboard();
       notify(`${account.name} ${saved.status === "Active" ? "activated" : "deactivated"}`);
     } catch (error) {
       notify(error.message, "error");
+    }
+  };
+  const updateLeaderboardAccount = async (account, changes) => {
+    if (!canManageAccounts) return null;
+    try {
+      const saved = await api.updateUser(account.id, changes);
+      const normalized = { ...saved, id: saved.id || saved.customId || saved._id };
+      setUsers((previous) => previous.map((user) => user.id === account.id ? normalized : user));
+      setPeople((previous) => previous.map((person) => person.id === account.id ? normalized : person));
+      await refreshLeaderboard();
+      notify(changes.leaderboardVisible === false ? "Removed from leaderboard" : changes.leaderboardVisible === true ? "Restored to leaderboard" : "Target updated");
+      return normalized;
+    } catch (error) {
+      notify(error.message || "Could not update leaderboard", "error");
+      return null;
     }
   };
   function exportData(rows, name, format = "csv") {
@@ -547,6 +572,7 @@ export default function CRMApp() {
       if (Array.isArray(updatedFollowups)) {
         setFollowups(updatedFollowups.map(normalizeFollowup));
       }
+      await refreshLeaderboard();
       notify(modal.record ? "Lead updated" : "Lead added successfully");
     }
     if (modal.type === "followup") {
@@ -596,11 +622,13 @@ export default function CRMApp() {
         const saved = modal.record
           ? await api.updateUser(modal.record.id, u)
           : await api.createUser(u);
+        const account = { ...saved, id: saved.id || saved.customId || saved._id };
         const nextUsers = modal.record
-          ? users.map((x) => (x.id === u.id ? saved : x))
-          : [saved, ...users];
+          ? users.map((x) => (x.id === u.id ? account : x))
+          : [account, ...users];
         setUsers(nextUsers);
         setPeople(nextUsers.filter((account) => ["Sales Executive", "Team Lead"].includes(account.role) && account.status === "Active"));
+        await refreshLeaderboard();
         notify(modal.record ? "User updated" : "User added");
       } catch (error) {
         notify(error.message, "error");
@@ -712,10 +740,6 @@ export default function CRMApp() {
             <span>ACADEMY</span>
           </span>
         </a>
-        <div className="nav-divider" />
-        <span className="workspace-name">
-          Workspace <ChevronDown size={12} />
-        </span>
         <div className="global-search">
           <Search size={16} />
           <input
@@ -775,7 +799,6 @@ export default function CRMApp() {
           )}
         </div>
         <div className="nav-actions">
-          <span className="demo-pill">ENTRAIN CRM</span>
           <button
             className="notification-button icon-button"
             aria-label="Notifications"
@@ -858,14 +881,19 @@ export default function CRMApp() {
         <div className="drawer-backdrop" onClick={() => setDrawer(false)} />
       )}
       <aside className={`sidebar ${drawer ? "drawer-open" : ""}`}>
-        <div className="workspace-switch">
-          <span className="workspace-icon">
-            <img src="/images/entrain-logo.png" alt="" />
-          </span>
-          <div>
-            <strong>Entrain workspace</strong>
-          </div>
-          <ChevronDown size={13} />
+        <div className="sidebar-top">
+          <button
+            className="sidebar-collapse"
+            type="button"
+            aria-label={drawer ? "Close navigation" : collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={drawer ? "Close navigation" : collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => {
+              if (window.matchMedia("(max-width: 760px)").matches) setDrawer(false);
+              else setCollapsed(!collapsed);
+            }}
+          >
+            {collapsed && !drawer ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}
+          </button>
         </div>
         <nav>
           {navGroups.map(([heading, items]) => {
@@ -886,11 +914,7 @@ export default function CRMApp() {
                     }}
                   >
                     <Icon size={17} />
-                    <span>
-                      {id === "customers" && role === "Sales Executive"
-                          ? "My Customers"
-                          : label}
-                    </span>
+                    <span>{label}</span>
                     {id === "leaderboard" && <i className="nav-new" />}
                   </a>
                 ))}
@@ -899,20 +923,6 @@ export default function CRMApp() {
           })}
         </nav>
         <div className="sidebar-bottom">
-          <button
-            onClick={() =>
-              notify("Need a hand? Contact your workspace administrator.")
-            }
-          >
-            <LifeBuoy size={17} />
-            <span>Help & support</span>
-            <ArrowUpRight size={13} />
-          </button>
-          <button onClick={() => setCollapsed(!collapsed)}>
-            <PanelLeftClose size={17} />
-            <span>Collapse sidebar</span>
-            <ChevronsLeft size={13} />
-          </button>
           <div className="sidebar-version">
             <span className="live-dot" /> ENTRAIN CRM <small>v1.0</small>
           </div>
@@ -928,9 +938,9 @@ export default function CRMApp() {
         <div className="breadcrumb">
           Workspace <ChevronRight size={12} />
           <span>{titles[page] || "Dashboard"}</span>
-          <div className="breadcrumb-right">
+          {page !== "dashboard" && <div className="breadcrumb-right">
             <span className="live-dot" /> {currentMonthYearStr}
-          </div>
+          </div>}
         </div>
         {!allowed ? (
           <section className="card detail-card">
@@ -960,26 +970,15 @@ export default function CRMApp() {
                 }
               >
                 {page === "dashboard" ? (
-                  <>
-                    <button
-                      className="date-button"
-                      onClick={() =>
-                        setPeriod(period === "Custom" ? "This Month" : "Custom")
-                      }
-                    >
-                      <CalendarClock size={15} /> {currentMonthRangeStr}{" "}
-                      <ChevronDown size={13} />
-                    </button>
-                    {canCreateLead && (
+                  canCreateLead && (
                       <button
                         className="primary"
-                      disabled={dataLoading}
+                        disabled={dataLoading}
                         onClick={() => setModal({ type: "lead" })}
                       >
                         <Plus size={16} /> Add lead
                       </button>
-                    )}
-                  </>
+                  )
                 ) : ["leads", "my-leads", "pipeline"].includes(page) && canCreateLead ? (
                   <button
                     className="primary"
@@ -1019,26 +1018,20 @@ export default function CRMApp() {
                 className={`period-row ${page === "dashboard" ? "dashboard-period-row" : ""}`}
               >
                 <DateRangeFilter value={period} onChange={setPeriod} />
-                {page === "dashboard" && (
-                  <span className="muted">
-                    <CalendarClock size={13} /> {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-                  </span>
-                )}
               </div>
             )}
             {page === "dashboard" && (
               <Dashboard
                 role={role}
                 leads={scopedLeads}
-                people={people}
+                people={leaderboardPeople}
+                viewerName={userName}
+                ownAccount={authUser}
                 staff={users}
                 followups={scopedFollowups}
                 calls={callsState}
                 navigate={navigate}
-                openModal={setModal}
                 period={period}
-                readOnly={readOnly}
-                canWorkRecord={canWorkRecord}
               />
             )}
             {["leads", "my-leads"].includes(page) &&
@@ -1100,7 +1093,14 @@ export default function CRMApp() {
             {page === "customers" && (
               <CustomersPage leads={scopedLeads} navigate={navigate} />
             )}
-            {page === "leaderboard" && <LeaderboardPage people={people} />}
+            {page === "leaderboard" && (
+              <LeaderboardPage
+                accounts={people}
+                canManage={canManageAccounts}
+                onAddPerson={() => setModal({ type: "user", context: "leaderboard" })}
+                onUpdateAccount={updateLeaderboardAccount}
+              />
+            )}
             {page === "targets" && (
               <TargetsPage
                 people={people}
@@ -1360,7 +1360,13 @@ export default function CRMApp() {
                     {field("Email", "email", "email")}
                     <label>{modal.record ? "New password (optional)" : "Temporary password"}<input name="password" type="password" minLength="8" required={!modal.record} autoComplete="new-password" /></label>
                     {field("Phone", "phone", "tel")}
-                    {field("Role", "role", "text", modal.record?.role && !roles.includes(modal.record.role) ? [...roles, modal.record.role] : roles)}
+                    {field("Role", "role", "text", modal.context === "leaderboard" ? ["Sales Executive", "Team Lead"] : modal.record?.role && !roles.includes(modal.record.role) ? [...roles, modal.record.role] : roles)}
+                    {modal.context === "leaderboard" && (
+                      <label>
+                        Monthly target (₹)
+                        <input name="target" type="number" min="1" step="1" defaultValue="500000" required />
+                      </label>
+                    )}
                   </>
                 )}
               </div>
@@ -1419,6 +1425,7 @@ export default function CRMApp() {
             setTasks([]);
             setUsers([]);
             setPeople([]);
+            setLeaderboardPeople([]);
             setDataLoading(true);
           }}
         />

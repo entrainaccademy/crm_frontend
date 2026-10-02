@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Trophy,
   Target,
@@ -10,6 +10,8 @@ import {
   Check,
   Shield,
   Save,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   DataTable,
@@ -20,20 +22,64 @@ import {
   FilterDropdown,
   SearchInput,
   DateRangeFilter,
+  Modal,
+  ConfirmDialog,
+  LoadingSkeleton,
 } from "./ui";
 import { rankExecutives, money, roles, access, sources, statuses, priorities, convertedStatuses, closedStatuses } from "@/lib/data";
 import { SalesChart } from "./dashboard";
-export function LeaderboardPage({ people }) {
+import { api } from "@/lib/api";
+export function LeaderboardPage({ accounts = [], canManage = false, onAddPerson, onUpdateAccount }) {
   const [period, setPeriod] = useState("This Month");
-  const multiplier =
-    period === "Last Month" ? 0.92 : period === "This Quarter" ? 2.8 : 1;
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [people, setPeople] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [removing, setRemoving] = useState(null);
+  const [restoreId, setRestoreId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const range = period === "This Month"
+    ? { startDate: formatDate(new Date(year, month, 1)), endDate: formatDate(new Date(year, month + 1, 0)) }
+    : period === "Last Month"
+      ? { startDate: formatDate(new Date(year, month - 1, 1)), endDate: formatDate(new Date(year, month, 0)) }
+      : period === "This Quarter"
+        ? { startDate: formatDate(new Date(year, Math.floor(month / 3) * 3, 1)), endDate: formatDate(new Date(year, Math.floor(month / 3) * 3 + 3, 0)) }
+        : { startDate, endDate };
+  const invalidRange = Boolean(range.startDate && range.endDate && range.startDate > range.endDate);
+  useEffect(() => {
+    if (!range.startDate || !range.endDate || invalidRange) {
+      setPeople([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    api.getLeaderboard(range).then((result) => {
+      if (cancelled) return;
+      if (Array.isArray(result)) { setPeople(result); setError(false); }
+      else setError(true);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [period, range.startDate, range.endDate, invalidRange, accounts]);
+  const targetMonths = period === "This Quarter" ? 3 : period === "Custom Range" && range.startDate && range.endDate
+    ? Math.max(1, ((new Date(`${range.endDate}T00:00:00`) - new Date(`${range.startDate}T00:00:00`)) / 86400000 + 1) / 30.44)
+    : 1;
   const ranked = rankExecutives(
     people.map((p) => ({
         ...p,
-        sales: Math.round(p.sales * multiplier),
-        target: period === "This Quarter" ? p.target * 3 : p.target,
+        id: p.id || p.customId || p._id,
+        monthlyTarget: Number(p.target) || 500000,
+        target: Math.round((Number(p.target) || 500000) * targetMonths),
       })),
   );
+  const restorable = accounts.filter((account) => account.status === "Active" && account.leaderboardVisible === false);
   return (
     <>
       <div className="stats-grid four">
@@ -68,6 +114,7 @@ export function LeaderboardPage({ people }) {
             </p>
           </div>
           <div className="filter-row">
+            {canManage && <button className="primary" onClick={onAddPerson}><Plus size={15} /> Add salesperson</button>}
             <FilterDropdown
               value={period}
               onChange={setPeriod}
@@ -80,12 +127,37 @@ export function LeaderboardPage({ people }) {
             />
             {period === "Custom Range" && (
               <>
-                <input aria-label="Start date" type="date" />
-                <input aria-label="End date" type="date" />
+                <input aria-label="Start date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+                <input aria-label="End date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
               </>
             )}
           </div>
         </div>
+        {canManage && restorable.length > 0 && (
+          <div className="filter-row" style={{ padding: "0 20px 16px" }}>
+            <select aria-label="Salesperson to restore" value={restoreId} onChange={(event) => setRestoreId(event.target.value)}>
+              <option value="">Restore a salesperson to the leaderboard</option>
+              {restorable.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+            </select>
+            <button disabled={!restoreId || busy} onClick={async () => {
+              const account = restorable.find((person) => String(person.id) === restoreId);
+              if (!account) return;
+              setBusy(true);
+              const saved = await onUpdateAccount(account, { leaderboardVisible: true });
+              if (saved) setRestoreId("");
+              setBusy(false);
+            }}>Restore</button>
+          </div>
+        )}
+        {period === "Custom Range" && (!startDate || !endDate) ? (
+          <div className="empty-inline">Choose a start and end date to see the leaderboard.</div>
+        ) : invalidRange ? (
+          <div className="empty-inline">End date must be on or after start date.</div>
+        ) : loading ? (
+          <LoadingSkeleton />
+        ) : error ? (
+          <div className="empty-inline">Could not load the leaderboard. Please refresh the page.</div>
+        ) : (
         <DataTable
           rows={ranked}
           columns={[
@@ -145,9 +217,46 @@ export function LeaderboardPage({ people }) {
                 />
               ),
             },
-          ]}
+            canManage && {
+              key: "actions",
+              label: "Actions",
+              render: (person) => (
+                <div className="row-actions">
+                  <button className="lead-action-icon" aria-label={`Edit target for ${person.name}`} title="Edit target" onClick={() => setEditing(person)}><Pencil size={16} /></button>
+                  <button className="lead-action-icon" aria-label={`Remove ${person.name} from leaderboard`} title="Remove from leaderboard" onClick={() => setRemoving(person)}><Trash2 size={16} /></button>
+                </div>
+              ),
+            },
+          ].filter(Boolean)}
         />
+        )}
       </section>
+      {editing && <Modal title={`Edit target for ${editing.name}`} onClose={() => setEditing(null)}>
+        <form onSubmit={async (event) => {
+          event.preventDefault();
+          const target = Number(new FormData(event.currentTarget).get("target"));
+          if (!Number.isFinite(target) || target <= 0) return;
+          setBusy(true);
+          const saved = await onUpdateAccount(editing, { target });
+          if (saved) setEditing(null);
+          setBusy(false);
+        }}>
+          <div className="modal-body"><label>Monthly target (₹)<input name="target" type="number" min="1" step="1" defaultValue={editing.monthlyTarget} required /></label></div>
+          <div className="modal-footer"><button type="button" onClick={() => setEditing(null)}>Cancel</button><button className="primary" disabled={busy} type="submit"><Save size={15} /> Save target</button></div>
+        </form>
+      </Modal>}
+      {removing && <ConfirmDialog
+        title={`Remove ${removing.name} from leaderboard?`}
+        message="Their account and leads will remain available. You can restore them later."
+        confirmLabel="Remove"
+        onClose={() => setRemoving(null)}
+        onConfirm={async () => {
+          setBusy(true);
+          const saved = await onUpdateAccount(removing, { leaderboardVisible: false });
+          if (saved) setRemoving(null);
+          setBusy(false);
+        }}
+      />}
     </>
   );
 }

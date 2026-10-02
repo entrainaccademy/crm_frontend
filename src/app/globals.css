@@ -3114,6 +3114,34 @@ textarea {
   background: #f1f4f8;
   border-right-color: #dce5ef;
 }
+.sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 64px;
+  border-bottom: 1px solid #dce5ef;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+.sidebar-collapse {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #51647b;
+  cursor: pointer;
+}
+.sidebar-collapse:hover,
+.sidebar-collapse:focus-visible {
+  background: #dfe8f3;
+  color: #315d8c;
+}
+.is-collapsed .sidebar-top {
+  justify-content: center;
+}
 .workspace-switch {
   border-bottom-color: #dce5ef;
 }

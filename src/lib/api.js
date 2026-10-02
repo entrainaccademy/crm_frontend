@@ -123,6 +123,11 @@ export const api = {
     const res = await request("/users");
     return res.success ? res.data : null;
   },
+  async getLeaderboard(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await request(`/users/leaderboard${query ? `?${query}` : ""}`, { cache: "no-store" });
+    return res.success ? res.data : null;
+  },
 
   // Tasks
   async getTasks() {
