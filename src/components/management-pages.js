@@ -5,7 +5,6 @@ import {
   Target,
   TrendingUp,
   Users,
-  Download,
   Plus,
   Check,
   Shield,
@@ -25,6 +24,7 @@ import {
   Modal,
   ConfirmDialog,
   LoadingSkeleton,
+  ExportMenu,
 } from "./ui";
 import { rankExecutives, money, roles, access, sources, statuses, priorities, convertedStatuses, closedStatuses } from "@/lib/data";
 import { SalesChart } from "./dashboard";
@@ -502,6 +502,14 @@ export function AnalyticsPage({
   const executive = people.find((person) => person.name === executiveName);
   const visiblePeople =
     page === "performance" ? (executive ? [executive] : []) : people;
+  const exportPeople = visiblePeople.map((person) => {
+    const converted = leads.filter((lead) => lead.assigned === person.name && convertedStatuses.includes(lead.status));
+    return {
+      ...person,
+      sales: converted.reduce((total, lead) => total + (Number(lead.saleAmount) || 0), 0) || person.sales || 0,
+      conversions: converted.length || person.conversions || 0,
+    };
+  });
 
   const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status));
   const totalSales = wonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
@@ -642,12 +650,7 @@ export function AnalyticsPage({
         <div className="section-heading">
           <h2>Salesperson performance</h2>
           <div className="row-actions">
-            <button onClick={() => exportData(visiblePeople, page)}>
-              <Download size={14} /> Export CSV
-            </button>
-            <button onClick={() => exportData(visiblePeople, page, "xls")}>
-              <Download size={14} /> Export Excel
-            </button>
+            <ExportMenu onExport={(format) => exportData(exportPeople, "performance", format)} />
           </div>
         </div>
         <DataTable

@@ -1,7 +1,20 @@
 "use client";
 import { useEffect, useRef } from "react";
 import Image from "next/image";
-import { X, Search, ChevronDown, ArrowUpRight } from "lucide-react";
+import { X, Search, ArrowUpRight, Download } from "lucide-react";
+export function ExportMenu({ onExport, label = "Export" }) {
+  return (
+    <label className="export-menu">
+      <Download size={15} aria-hidden="true" />
+      <select aria-label={`${label} format`} value="" onChange={(event) => onExport(event.target.value)}>
+        <option value="" disabled>{label}</option>
+        <option value="csv">CSV</option>
+        <option value="xlsx">Excel (.xlsx)</option>
+        <option value="pdf">PDF</option>
+      </select>
+    </label>
+  );
+}
 export function UserAvatar({ name = "Shamil", size = "", index = 0 }) {
   return (
     <span className={`avatar avatar-${index % 5} ${size}`}>

@@ -28,7 +28,6 @@ import {
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
-  Download,
 } from "lucide-react";
 import Dashboard from "./dashboard";
 import CourseCombobox from "./course-combobox";
@@ -40,6 +39,7 @@ import {
   StatusBadge,
   ConfirmDialog,
   EmptyState,
+  ExportMenu,
 } from "./ui";
 import {
   LeadsPage,
@@ -65,6 +65,7 @@ import {
   initialFollowups,
   notifications,
   statuses,
+  convertedStatuses,
   sources,
   priorities,
   money,
@@ -73,6 +74,7 @@ import {
   normalizeLead,
   normalizeFollowup,
 } from "@/lib/data";
+import { downloadExport } from "@/lib/export";
 import { api } from "@/lib/api";
 const navGroups = [
   ["", [["dashboard", "Dashboard", LayoutDashboard]]],
@@ -347,6 +349,11 @@ export default function CRMApp() {
   const scopedFollowups = followups.filter(
     (l) => !scopedNames || scopedNames.includes(l.assigned),
   );
+  const reportRows = page === "sales-reports"
+    ? scopedLeads.filter((lead) => convertedStatuses.includes(lead.status))
+    : page === "lead-reports" ? scopedLeads
+      : page === "call-reports" ? callsState.filter((call) => !scopedNames || scopedNames.includes(call.assigned))
+        : page === "follow-up-reports" ? scopedFollowups : [];
   const allowed =
     access[role].includes(page) ||
     (page === "leads" && detailId && role === "Sales Executive");
@@ -435,55 +442,13 @@ export default function CRMApp() {
       return null;
     }
   };
-  function exportData(rows, name, format = "csv") {
-    if (!rows.length) {
-      notify("No records to export", "error");
-      return;
+  async function exportData(rows, name, format = "csv") {
+    try {
+      await downloadExport(rows, name, format);
+      notify(`${format === "xlsx" ? "Excel" : format.toUpperCase()} export is ready`);
+    } catch (error) {
+      notify(error.message || "Could not export records", "error");
     }
-    const fields = Object.keys(rows[0]).filter(
-      (k) => typeof rows[0][k] !== "object",
-    );
-    let content, type;
-    if (format === "xls") {
-      const esc = (v) =>
-        String(v ?? "")
-          .replaceAll("&", "&amp;")
-          .replaceAll("<", "&lt;");
-      content =
-        '<html><meta charset="utf-8"><table><tr>' +
-        fields.map((k) => "<th>" + esc(k) + "</th>").join("") +
-        "</tr>" +
-        rows
-          .map(
-            (r) =>
-              "<tr>" +
-              fields.map((k) => "<td>" + esc(r[k]) + "</td>").join("") +
-              "</tr>",
-          )
-          .join("") +
-        "</table></html>";
-      type = "application/vnd.ms-excel";
-    } else {
-      const cell = (v) =>
-        '"' +
-        String(v ?? "")
-          .replace(/^[=+@-]/, "'")
-          .replaceAll('"', '""') +
-        '"';
-      content =
-        "\uFEFF" +
-        [fields, ...rows.map((r) => fields.map((k) => r[k]))]
-          .map((r) => r.map(cell).join(","))
-          .join("\r\n");
-      type = "text/csv;charset=utf-8";
-    }
-    const url = URL.createObjectURL(new Blob([content], { type }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `entrain-${name}.${format}`;
-    a.click();
-    URL.revokeObjectURL(url);
-    notify("Your export is ready");
   }
   async function saveForm(e) {
     e.preventDefault();
@@ -1003,9 +968,7 @@ export default function CRMApp() {
                     <Plus size={16} /> Add user
                   </button>
                 ) : page.includes("reports") ? (
-                  <button onClick={() => exportData(people, page)}>
-                    <Download size={15} /> Export report
-                  </button>
+                  <ExportMenu label="Export report" onExport={(format) => exportData(reportRows, page, format)} />
                 ) : null}
               </PageHeader>
             )}

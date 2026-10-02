@@ -1046,6 +1046,32 @@ td small {
   gap: 8px;
   margin-left: auto;
 }
+.export-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: #234d78;
+  white-space: nowrap;
+}
+.export-menu select {
+  width: auto;
+  min-width: 74px;
+  height: 100%;
+  padding: 0 15px 0 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.export-menu:hover,
+.export-menu:focus-within {
+  border-color: #9eb5cc;
+}
 .filter-row {
   display: flex;
   flex-wrap: wrap;

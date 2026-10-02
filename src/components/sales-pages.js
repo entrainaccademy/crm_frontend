@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   Plus,
   SlidersHorizontal,
-  Download,
   ChevronLeft,
   ChevronRight,
   Phone,
@@ -22,6 +21,7 @@ import {
 import {
   DataTable,
   SearchInput,
+  ExportMenu,
   FilterDropdown,
   StatusBadge,
   UserAvatar,
@@ -65,9 +65,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
           <button onClick={() => setFilters(!filters)}>
             <SlidersHorizontal size={15} /> Filters
           </button>
-          <button onClick={() => exportData(rows, "leads")}>
-            <Download size={15} /> Export
-          </button>
+          <ExportMenu onExport={(format) => exportData(rows, "leads", format)} />
         </div>
       </div>
       {filters && (

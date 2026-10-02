@@ -304,9 +304,6 @@ export default function Dashboard({
 
   return (
     <>
-      <div className="overview-label">
-        <span>BUSINESS OVERVIEW</span>
-      </div>
       <div className="stats-grid dashboard-stats">
         {stats.map(([label, value, change, icon], i) => (
           <StatCard
