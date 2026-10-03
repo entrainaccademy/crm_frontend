@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -63,7 +63,6 @@ import {
   access,
   initialLeads,
   initialFollowups,
-  notifications,
   statuses,
   convertedStatuses,
   sources,
@@ -182,7 +181,6 @@ function SessionLoading({ page }) {
       </header>
       <aside className="session-loading-sidebar">Entrain workspace</aside>
       <main className="session-loading-main">
-        <div className="session-loading-breadcrumb">Workspace <ChevronRight size={12} /> {titles[page] || "Dashboard"}</div>
         <div className="session-loading-title">
           <h1>{titles[page] || "Dashboard"}</h1>
           <p>{descriptions[page] || "Your sales workspace."}</p>
@@ -211,17 +209,43 @@ export default function CRMApp() {
     [users, setUsers] = useState([]),
     [dataLoading, setDataLoading] = useState(true),
     [usersError, setUsersError] = useState(false),
+    [leadsError, setLeadsError] = useState(false),
+    [leadsRefreshing, setLeadsRefreshing] = useState(false),
+    [leadsReload, setLeadsReload] = useState(0),
     [collapsed, setCollapsed] = useState(false),
+    [reportsOpen, setReportsOpen] = useState(page.endsWith("-reports")),
     [drawer, setDrawer] = useState(false),
     [dropdown, setDropdown] = useState(""),
     [search, setSearch] = useState(""),
     [period, setPeriod] = useState("This Month"),
     [modal, setModal] = useState(null),
     [toast, setToast] = useState(null),
-    [read, setRead] = useState(false),
+    [userNotifications, setUserNotifications] = useState([]),
     [hydrated, setHydrated] = useState(false);
+  const notificationButtonRef = useRef(null);
+  const notificationPanelRef = useRef(null);
+  const accountButtonRef = useRef(null);
+  const accountPanelRef = useRef(null);
+  useEffect(() => {
+    if (!dropdown) return;
+    const trigger = dropdown === "notifications" ? notificationButtonRef.current : accountButtonRef.current;
+    const panel = dropdown === "notifications" ? notificationPanelRef.current : accountPanelRef.current;
+    const closeIfOutside = (event) => {
+      if (!trigger?.contains(event.target) && !panel?.contains(event.target)) setDropdown("");
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setDropdown("");
+    };
+    document.addEventListener("pointerdown", closeIfOutside);
+    document.addEventListener("focusin", closeIfOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeIfOutside);
+      document.removeEventListener("focusin", closeIfOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [dropdown]);
   const todayStr = new Date().toISOString().split("T")[0];
-  const currentMonthYearStr = new Date().toLocaleString("en-US", { month: "long", year: "numeric" });
   useEffect(() => {
     const handle = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -234,11 +258,28 @@ export default function CRMApp() {
   }, []);
   const navigate = (p) => {
     router.push(p === "dashboard" ? "/" : "/" + p);
+    if (!p.endsWith("-reports")) setReportsOpen(false);
     setDrawer(false);
     setDropdown("");
     setSearch("");
   };
+  useEffect(() => {
+    if (page.endsWith("-reports")) setReportsOpen(true);
+  }, [page]);
   const notify = (message, type = "success") => setToast({ message, type, id: Date.now() });
+  const markAllRead = async () => {
+    if (!await api.markAllNotificationsRead()) { notify("Could not mark notifications as read.", "error"); return; }
+    setUserNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })));
+  };
+  const openNotification = async (item) => {
+    if (!item.readAt) {
+      const saved = await api.markNotificationRead(item._id);
+      if (saved) setUserNotifications((items) => items.map((entry) => entry._id === item._id ? saved : entry));
+      else notify("Could not mark notification as read.", "error");
+    }
+    if (item.leadCustomId) navigate(`${role === "Sales Executive" || role === "Team Lead" ? "my-leads" : "leads"}/${item.leadCustomId}`);
+    else setDropdown("");
+  };
   useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(null), 4500);
@@ -264,6 +305,7 @@ export default function CRMApp() {
     let cancelled = false;
     setDataLoading(true);
     setUsersError(false);
+    setLeadsError(false);
     async function loadData() {
       try {
         const monthStart = new Date();
@@ -281,8 +323,10 @@ export default function CRMApp() {
           ]);
         if (cancelled) return;
 
-        if (leadsData && Array.isArray(leadsData)) {
+        if (Array.isArray(leadsData)) {
           setLeads(leadsData.map(normalizeLead));
+        } else {
+          setLeadsError(true);
         }
         if (followupsData && Array.isArray(followupsData)) {
           setFollowups(followupsData.map(normalizeFollowup));
@@ -317,6 +361,32 @@ export default function CRMApp() {
     }
     loadData();
     return () => { cancelled = true; };
+  }, [authUser]);
+  useEffect(() => {
+    if (!authUser || !["leads", "my-leads"].includes(page) || dataLoading) return;
+    let cancelled = false;
+    setLeadsRefreshing(true);
+    api.getLeads().then((items) => {
+      if (cancelled) return;
+      if (Array.isArray(items)) {
+        setLeads(items.map(normalizeLead));
+        setLeadsError(false);
+      } else {
+        setLeadsError(true);
+      }
+    }).finally(() => { if (!cancelled) setLeadsRefreshing(false); });
+    return () => { cancelled = true; };
+  }, [authUser, page, dataLoading, leadsReload]);
+  useEffect(() => {
+    if (!authUser) { setUserNotifications([]); return; }
+    let cancelled = false;
+    const refreshNotifications = async () => {
+      const items = await api.getNotifications();
+      if (!cancelled && Array.isArray(items)) setUserNotifications(items);
+    };
+    refreshNotifications();
+    const interval = setInterval(refreshNotifications, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [authUser]);
   useEffect(() => {
     if (!authUser || page !== "follow-ups" || dataLoading) return;
@@ -689,7 +759,7 @@ export default function CRMApp() {
           <Menu size={20} />
         </button>
         <a
-          className="brand"
+          className="brand mobile-brand"
           href="/"
           aria-label="ENTRAIN Academy CRM"
           onClick={(e) => {
@@ -697,13 +767,7 @@ export default function CRMApp() {
             navigate("dashboard");
           }}
         >
-          <span className="brand-crest">
-            <img src="/images/entrain-logo.png" alt="" />
-          </span>
-          <span className="brand-wordmark">
-            <strong>ENTRAIN</strong>
-            <span>ACADEMY</span>
-          </span>
+          <img className="brand-full" src="/images/entrain-logo.png" alt="ENTRAIN Academy" />
         </a>
         <div className="global-search">
           <Search size={16} />
@@ -765,80 +829,44 @@ export default function CRMApp() {
         </div>
         <div className="nav-actions">
           <button
+            ref={notificationButtonRef}
             className="notification-button icon-button"
             aria-label="Notifications"
-            onClick={() =>
-              setDropdown(dropdown === "notifications" ? "" : "notifications")
-            }
+            aria-expanded={dropdown === "notifications"}
+            onClick={async () => {
+              const opening = dropdown !== "notifications";
+              setDropdown(opening ? "notifications" : "");
+              if (opening) {
+                const items = await api.getNotifications();
+                if (Array.isArray(items)) setUserNotifications(items);
+              }
+            }}
           >
             <Bell size={18} />
-            {!read && <i />}
-          </button>
-          <span className="nav-divider" />
-          <button
-            className="profile-button"
-            onClick={() => setDropdown(dropdown === "profile" ? "" : "profile")}
-          >
-            <UserAvatar name={userName} />
-            <span>
-              <strong>{userName}</strong>
-              <small>{role}</small>
-            </span>
-            <ChevronDown size={13} />
+            {userNotifications.some((item) => !item.readAt) && <i />}
           </button>
         </div>
         {dropdown === "notifications" && (
-          <div className="nav-dropdown notifications">
+          <div className="nav-dropdown notifications" ref={notificationPanelRef}>
             <div className="dropdown-title">
               Notifications
-              <button className="text-button" onClick={() => setRead(true)}>
-                Mark all read
-              </button>
+              {userNotifications.some((item) => !item.readAt) && (
+                <button className="text-button" onClick={markAllRead}>Mark all read</button>
+              )}
             </div>
-            {notifications.map((n, i) => (
+            {userNotifications.length === 0 && <p className="notifications-empty">No notifications yet</p>}
+            {userNotifications.map((item) => (
               <button
-                key={n}
-                onClick={() => {
-                  notify(n);
-                  setRead(true);
-                }}
+                key={item._id}
+                onClick={() => openNotification(item)}
               >
-                <span className={`notification-dot ${read ? "read" : ""}`} />
+                <span className={`notification-dot ${item.readAt ? "read" : ""}`} />
                 <span>
-                  {n}
-                  <small>
-                    {i + 1} hour{i ? "s" : ""} ago
-                  </small>
+                  {item.message}
+                  <small>{new Date(item.createdAt).toLocaleString()}</small>
                 </span>
               </button>
             ))}
-          </div>
-        )}
-        {dropdown === "profile" && (
-          <div className="nav-dropdown profile-dropdown">
-            <strong>{userName}</strong>
-            <small>{authUser.email}</small>
-            <button
-              onClick={() => {
-                setModal({ type: "profile" });
-                setDropdown("");
-              }}
-            >
-              <UserRound size={15} /> My Profile
-            </button>
-            {canManageAccounts && (
-              <button onClick={() => navigate("settings")}>
-                <Settings size={15} /> Settings
-              </button>
-            )}
-            <button
-              onClick={() => {
-                setModal({ type: "logout" });
-                setDropdown("");
-              }}
-            >
-              <LogOut size={15} /> Logout
-            </button>
           </div>
         )}
       </header>
@@ -847,6 +875,17 @@ export default function CRMApp() {
       )}
       <aside className={`sidebar ${drawer ? "drawer-open" : ""}`}>
         <div className="sidebar-top">
+          <a
+            className="brand sidebar-brand"
+            href="/"
+            aria-label="ENTRAIN Academy CRM"
+            onClick={(event) => {
+              event.preventDefault();
+              navigate("dashboard");
+            }}
+          >
+            <img className="brand-full" src="/images/entrain-logo.png" alt="ENTRAIN Academy" />
+          </a>
           <button
             className="sidebar-collapse"
             type="button"
@@ -866,8 +905,20 @@ export default function CRMApp() {
             if (!visible.length) return null;
             return (
               <div className="nav-group" key={heading}>
-                {heading && <div className="nav-group-label">{heading}</div>}
-                {visible.map(([id, label, Icon]) => (
+                {heading === "REPORTS" ? (
+                  <button
+                    type="button"
+                    className="nav-group-toggle"
+                    aria-label="Reports"
+                    aria-expanded={reportsOpen}
+                    onClick={() => setReportsOpen((open) => !open)}
+                  >
+                    <FileChartColumn size={17} />
+                    <span>REPORTS</span>
+                    <ChevronDown size={14} className={reportsOpen ? "is-open" : ""} />
+                  </button>
+                ) : heading && <div className="nav-group-label">{heading}</div>}
+                {(heading !== "REPORTS" || reportsOpen) && visible.map(([id, label, Icon]) => (
                   <a
                     key={id}
                     href={id === "dashboard" ? "/" : "/" + id}
@@ -888,25 +939,37 @@ export default function CRMApp() {
           })}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-version">
-            <span className="live-dot" /> ENTRAIN CRM <small>v1.0</small>
-          </div>
+          <button
+            ref={accountButtonRef}
+            className="profile-button sidebar-profile-button"
+            aria-expanded={dropdown === "profile"}
+            onClick={() => setDropdown(dropdown === "profile" ? "" : "profile")}
+          >
+            <UserAvatar name={userName} />
+            <span><strong>{userName}</strong><small>{role}</small></span>
+            <ChevronDown size={13} />
+          </button>
+          {dropdown === "profile" && (
+            <div className="nav-dropdown profile-dropdown sidebar-profile-dropdown" ref={accountPanelRef}>
+              <strong>{userName}</strong>
+              <small>{authUser.email}</small>
+              <button onClick={() => { setModal({ type: "profile" }); setDropdown(""); }}>
+                <UserRound size={15} /> My Profile
+              </button>
+              {canManageAccounts && <button onClick={() => navigate("settings")}><Settings size={15} /> Settings</button>}
+              <button onClick={() => { setModal({ type: "logout" }); setDropdown(""); }}>
+                <LogOut size={15} /> Logout
+              </button>
+            </div>
+          )}
+          {/* <div className="sidebar-version">
+            <span className="live-dot" />  <small>v1.0</small>
+          </div> */}
         </div>
       </aside>
       <main
-        className={
-          ["follow-ups", "calls", "customers", "staff", "users"].includes(page)
-            ? "main table-page"
-            : "main"
-        }
+        className={`main${page === "dashboard" ? " dashboard-page" : ""}${["follow-ups", "calls", "customers", "staff", "users"].includes(page) ? " table-page" : ""}`}
       >
-        <div className="breadcrumb">
-          Workspace <ChevronRight size={12} />
-          <span>{titles[page] || "Dashboard"}</span>
-          {page !== "dashboard" && <div className="breadcrumb-right">
-            <span className="live-dot" /> {currentMonthYearStr}
-          </div>}
-        </div>
         {!allowed ? (
           <section className="card detail-card">
             <ShieldCheck />
@@ -972,7 +1035,7 @@ export default function CRMApp() {
                 ) : null}
               </PageHeader>
             )}
-            {dataLoading && !["settings", "users"].includes(page) ? (
+            {(dataLoading || (leadsRefreshing && scopedLeads.length === 0 && ["leads", "my-leads"].includes(page))) && !["settings", "users"].includes(page) ? (
               <WorkspaceSkeleton page={page} />
             ) : (
               <>
@@ -997,7 +1060,13 @@ export default function CRMApp() {
                 period={period}
               />
             )}
-            {["leads", "my-leads"].includes(page) &&
+            {["leads", "my-leads"].includes(page) && leadsError && scopedLeads.length === 0 ? (
+              <section className="card detail-card" role="alert">
+                <h2>Could not load leads</h2>
+                <p>Please try loading this page again.</p>
+                <button onClick={() => setLeadsReload((count) => count + 1)}>Retry</button>
+              </section>
+            ) : ["leads", "my-leads"].includes(page) &&
               (detailId ? (
                 <LeadDetails
                   lead={scopedLeads.find((l) => l.id === detailId)}

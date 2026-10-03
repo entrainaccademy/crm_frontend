@@ -5,6 +5,7 @@ async function request(endpoint, options = {}) {
     const { headers, ...rest } = options;
     const token = typeof window !== "undefined" ? sessionStorage.getItem("entrain-token") : null;
     const res = await fetch(`${API_BASE}${endpoint}`, {
+      cache: "no-store",
       ...rest,
       headers: {
         "Content-Type": "application/json",
@@ -37,6 +38,18 @@ export const api = {
   },
   logout() {
     sessionStorage.removeItem("entrain-token");
+  },
+  async getNotifications() {
+    const res = await request("/notifications", { cache: "no-store" });
+    return res.success ? res.data : null;
+  },
+  async markNotificationRead(id) {
+    const res = await request(`/notifications/${id}/read`, { method: "PATCH" });
+    return res.success ? res.data : null;
+  },
+  async markAllNotificationsRead() {
+    const res = await request("/notifications/read-all", { method: "PATCH" });
+    return res.success;
   },
   async createUser(data) {
     const res = await request("/users", { method: "POST", body: JSON.stringify(data) });
