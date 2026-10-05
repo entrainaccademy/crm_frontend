@@ -38,7 +38,8 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
     [assigned, setAssigned] = useState(""),
     [priority, setPriority] = useState(""),
     [service, setService] = useState(""),
-    [date, setDate] = useState(""),
+    [dateFrom, setDateFrom] = useState(""),
+    [dateTo, setDateTo] = useState(""),
     [page, setPage] = useState(1);
   const rows = leads.filter(
     (l) =>
@@ -48,7 +49,8 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
       (!assigned || l.assigned === assigned) &&
       (!priority || (priority === "No priority" ? !l.priority : l.priority === priority)) &&
       (!service || l.service === service) &&
-      (!date || l.created === date),
+      (!dateFrom || l.created >= dateFrom) &&
+      (!dateTo || l.created <= dateTo),
   );
   return (
     <section className="card leads-table-card">
@@ -99,19 +101,40 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
               allLabel={l === "Status" ? "All statuses" : undefined}
             />
           ))}
-          <input
-            type="date"
-            aria-label="Created date"
-            value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
-              setPage(1);
-            }}
-          />
+          <div className="lead-date-range" role="group" aria-label="Created date range">
+            <span>Created</span>
+            <label>
+              From
+              <input
+                type="date"
+                aria-label="Created from date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </label>
+            <label>
+              To
+              <input
+                type="date"
+                aria-label="Created to date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </label>
+          </div>
         </div>
       )}
       <DataTable
         rows={rows.slice((page - 1) * 8, page * 8)}
+        rowClassName={(lead) => `lead-status-row lead-status-${(lead.status || "no-status").toLowerCase().replaceAll(" ", "-")}`}
         onRow={(lead) => {
           if (canEditLead(lead)) {
             openModal({ type: "lead", record: lead });
@@ -362,8 +385,11 @@ export function FollowupsPage({
   canWorkRecord = () => true,
 }) {
   const [tab, setTab] = useState("All");
+  const [page, setPage] = useState(1);
   const [pendingId, setPendingId] = useState(null);
   const todayStr = new Date().toISOString().split("T")[0];
+  const followupStatus = (followup) =>
+    followup.completed ? "Completed" : followup.date && followup.date < todayStr ? "Overdue" : "Scheduled";
   const rows = followups.filter((f) =>
     tab === "All"
       ? true
@@ -376,21 +402,28 @@ export function FollowupsPage({
             ? f.date > todayStr
             : f.date < todayStr),
   );
+  const pageSize = 8;
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
   return (
-    <section className="card">
+    <section className="card followups-table-card">
       <div className="tabs">
         {["All", "Today", "Upcoming", "Overdue", "Completed"].map((t) => (
           <button
             key={t}
             className={tab === t ? "active" : ""}
-            onClick={() => setTab(t)}
+            onClick={() => {
+              setTab(t);
+              setPage(1);
+            }}
           >
             {t}
           </button>
         ))}
       </div>
       <DataTable
-        rows={rows}
+        rows={rows.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
+        rowClassName={(followup) => `followup-status-row followup-status-${followupStatus(followup).toLowerCase()}`}
         columns={[
           {
             key: "name",
@@ -405,17 +438,7 @@ export function FollowupsPage({
           {
             key: "status",
             label: "Status",
-            render: (r) => (
-              <StatusBadge
-                status={
-                  r.completed
-                    ? "Completed"
-                    : r.date && r.date < todayStr
-                      ? "Overdue"
-                      : "Scheduled"
-                }
-              />
-            ),
+            render: (r) => <StatusBadge status={followupStatus(r)} />,
           },
           {
             key: "actions",
@@ -462,6 +485,29 @@ export function FollowupsPage({
           },
         ]}
       />
+      <div className="pagination">
+        <span>
+          Showing {rows.length ? (currentPage - 1) * pageSize + 1 : 0}–
+          {Math.min(currentPage * pageSize, rows.length)} of {rows.length} follow-ups
+        </span>
+        <div>
+          <button
+            disabled={currentPage === 1}
+            aria-label="Previous page"
+            onClick={() => setPage(currentPage - 1)}
+          >
+            <ChevronLeft size={15} />
+          </button>
+          <span>{currentPage} / {pageCount}</span>
+          <button
+            disabled={currentPage === pageCount}
+            aria-label="Next page"
+            onClick={() => setPage(currentPage + 1)}
+          >
+            <ChevronRight size={15} />
+          </button>
+        </div>
+      </div>
     </section>
   );
 }
