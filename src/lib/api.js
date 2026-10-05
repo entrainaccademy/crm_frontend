@@ -163,9 +163,29 @@ export const api = {
   },
 
   // Courses
-  async getCourses() {
-    const res = await request("/courses");
+  async getCourses(includeInactive = false) {
+    const res = await request(`/courses${includeInactive ? "?includeInactive=true" : ""}`);
     return res.success ? res.data : null;
+  },
+  async createCourse(data) {
+    const res = await request("/courses", { method: "POST", body: JSON.stringify(data) });
+    if (!res.success) throw new Error(res.message || res.error || "Could not create course");
+    return res.data;
+  },
+  async updateCourse(id, data) {
+    const res = await request(`/courses/${id}`, { method: "PUT", body: JSON.stringify(data) });
+    if (!res.success) throw new Error(res.message || res.error || "Could not update course");
+    return res.data;
+  },
+  async deleteCourse(id) {
+    const res = await request(`/courses/${id}`, { method: "DELETE" });
+    if (!res.success) throw new Error(res.message || res.error || "Could not archive course");
+    return res.data;
+  },
+  async permanentlyDeleteCourse(id) {
+    const res = await request(`/courses/${id}/permanent`, { method: "DELETE" });
+    if (!res.success) throw new Error(res.message || res.error || "Could not delete course");
+    return res.data;
   },
 
   // Dashboard Stats

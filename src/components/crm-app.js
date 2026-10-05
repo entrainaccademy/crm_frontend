@@ -14,6 +14,7 @@ import {
   FileChartColumn,
   ShieldCheck,
   Settings,
+  BookOpen,
   Search,
   Bell,
   ChevronDown,
@@ -31,6 +32,7 @@ import {
 } from "lucide-react";
 import Dashboard from "./dashboard";
 import CourseCombobox from "./course-combobox";
+import CoursesPage from "./courses-page";
 import {
   PageHeader,
   DateRangeFilter,
@@ -68,8 +70,6 @@ import {
   sources,
   priorities,
   money,
-  courses,
-  courseFees,
   normalizeLead,
   normalizeFollowup,
 } from "@/lib/data";
@@ -99,7 +99,7 @@ const navGroups = [
     [
       ["staff", "Staff", Users],
       ["performance", "Performance", ChartNoAxesCombined],
-      ["tasks", "Tasks", BriefcaseBusiness],
+      // ["tasks", "Tasks", BriefcaseBusiness],
     ],
   ],
   [
@@ -115,6 +115,7 @@ const navGroups = [
     "ADMINISTRATION",
     [
       ["users", "Users & Roles", ShieldCheck],
+      ["courses", "Courses", BookOpen],
       ["settings", "Settings", Settings],
     ],
   ],
@@ -136,6 +137,7 @@ const descriptions = {
   staff: "The people behind your progress.",
   performance: "Understand what’s working. Find your next opportunity.",
   users: "Manage your people and their workspace access.",
+  courses: "Manage the courses available when creating leads.",
   settings: "Make ENTRAIN CRM work for your organization.",
 };
 
@@ -270,6 +272,7 @@ function CallModalFields({ modal, scopedLeads, people, assignmentNames, role, us
           Course / Service
           <select name="service" value={service} onChange={(e) => setService(e.target.value)}>
             <option value="">General Inquiry</option>
+            {service && !courses.some((course) => course.name === service) && <option value={service}>{service} (archived)</option>}
             {courses.map((c) => (
               <option key={c.name} value={c.name}>{c.name}</option>
             ))}
@@ -391,6 +394,9 @@ export default function CRMApp() {
     [leaderboardPeople, setLeaderboardPeople] = useState([]),
     [leaderboardLoadError, setLeaderboardLoadError] = useState(false),
     [users, setUsers] = useState([]),
+    [courseCatalog, setCourseCatalog] = useState([]),
+    [coursesError, setCoursesError] = useState(false),
+    [courseEditor, setCourseEditor] = useState(null),
     [dataLoading, setDataLoading] = useState(true),
     [usersError, setUsersError] = useState(false),
     [leadsError, setLeadsError] = useState(false),
@@ -496,7 +502,7 @@ export default function CRMApp() {
         monthStart.setDate(1);
         const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
         const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-        const [leadsData, followupsData, callsData, tasksData, usersData, leaderboardData] =
+        const [leadsData, followupsData, callsData, tasksData, usersData, leaderboardData, coursesData] =
           await Promise.all([
             api.getLeads(),
             api.getFollowups(),
@@ -504,8 +510,15 @@ export default function CRMApp() {
             api.getTasks(),
             api.getUsers(),
             api.getLeaderboard({ startDate: dateKey(monthStart), endDate: dateKey(monthEnd) }),
+            api.getCourses(["Super Admin", "Data Analytics Manager"].includes(authUser.role)),
           ]);
         if (cancelled) return;
+        if (Array.isArray(coursesData)) {
+          setCourseCatalog(coursesData);
+          setCoursesError(false);
+        } else {
+          setCoursesError(true);
+        }
 
         if (Array.isArray(leadsData)) {
           setLeads(leadsData.map(normalizeLead));
@@ -610,6 +623,17 @@ export default function CRMApp() {
   const userName = authUser?.name || "User";
   const readOnly = role === "Super Admin";
   const canManageAccounts = ["Super Admin", "Data Analytics Manager"].includes(role);
+  const courses = courseCatalog.filter((course) => course.status === "Active");
+  const refreshCourses = async () => {
+    const items = await api.getCourses(canManageAccounts);
+    if (!Array.isArray(items)) {
+      setCoursesError(true);
+      throw new Error("Could not load courses. Please try again.");
+    }
+    setCourseCatalog(items);
+    setCoursesError(false);
+    return items;
+  };
   const canCreateLead = ["Data Analytics Manager", "Team Lead", "Sales Executive"].includes(role);
   const canEditLead = (lead) =>
     role === "Data Analytics Manager" ||
@@ -759,7 +783,12 @@ export default function CRMApp() {
       setCallsState((prev) => [saved, ...prev]);
 
       if (data.createAsLead === "on" || data.createAsLead === "true") {
-        const selectedCourse = courses.find((course) => course.name === data.service) || courses[0];
+        const selectedCourse = courses.find((course) => course.name === data.service);
+        if (!selectedCourse) {
+          notify("Call logged, but no active course was selected to create a lead.", "error");
+          setModal(null);
+          return;
+        }
         const newLead = {
           name: callData.name,
           phone: callData.phone,
@@ -807,7 +836,7 @@ export default function CRMApp() {
       const saleAmount = Number(data.saleAmount),
         advanceAmount = Number(data.advanceAmount);
       const selectedCourse = courses.find((course) => course.name === data.service);
-      if (!selectedCourse) {
+      if (!selectedCourse && !(modal.record && modal.record.service === data.service)) {
         notify("Select an interested course.", "error");
         return;
       }
@@ -1218,7 +1247,7 @@ export default function CRMApp() {
               <button onClick={() => { setModal({ type: "profile" }); setDropdown(""); }}>
                 <UserRound size={15} /> My Profile
               </button>
-              {canManageAccounts && <button onClick={() => navigate("settings")}><Settings size={15} /> Settings</button>}
+              {access[role].includes("settings") && <button onClick={() => navigate("settings")}><Settings size={15} /> Settings</button>}
               <button onClick={() => { setModal({ type: "logout" }); setDropdown(""); }}>
                 <LogOut size={15} /> Logout
               </button>
@@ -1230,7 +1259,7 @@ export default function CRMApp() {
         </div>
       </aside>
       <main
-        className={`main${page === "dashboard" ? " dashboard-page" : ""}${["follow-ups", "calls", "customers", "staff", "users"].includes(page) ? " table-page" : ""}`}
+        className={`main${page === "dashboard" ? " dashboard-page" : ""}${["follow-ups", "calls", "customers", "staff", "users", "courses"].includes(page) ? " table-page" : ""}`}
       >
         {!allowed ? (
           <section className="card detail-card">
@@ -1300,12 +1329,14 @@ export default function CRMApp() {
                   >
                     <Plus size={16} /> Add user
                   </button>
+                ) : page === "courses" && canManageAccounts ? (
+                  <button className="primary" onClick={() => setCourseEditor("new")}><Plus size={16} /> Add course</button>
                 ) : page.includes("reports") ? (
                   <ExportMenu label="Export report" onExport={(format) => exportData(reportRows, page, format)} />
                 ) : null}
               </PageHeader>
             )}
-            {(dataLoading || (leadsRefreshing && scopedLeads.length === 0 && ["leads", "my-leads"].includes(page))) && !["settings", "users"].includes(page) ? (
+            {(dataLoading || (leadsRefreshing && scopedLeads.length === 0 && ["leads", "my-leads"].includes(page))) && !["settings", "users", "courses"].includes(page) ? (
               <WorkspaceSkeleton page={page} />
             ) : (
               <>
@@ -1457,6 +1488,9 @@ export default function CRMApp() {
                 canManage={canManageAccounts}
               />
             )}
+            {page === "courses" && canManageAccounts && (
+              <CoursesPage courses={courseCatalog} loading={dataLoading} loadError={coursesError} onRefresh={refreshCourses} notify={notify} editor={courseEditor} setEditor={setCourseEditor} />
+            )}
             {page === "settings" && <SettingsPage notify={notify} />}
             {page === "tasks" && <TasksPage tasks={tasks} setTasks={setTasks} />}
               </>
@@ -1517,14 +1551,18 @@ export default function CRMApp() {
                       <span>Interested course</span>
                       <CourseCombobox
                         key={modal.record?.id || "new-lead"}
-                        courses={courses}
+                        courses={modal.record?.service && !courses.some((course) => course.name === modal.record.service)
+                          ? [...courses, { name: modal.record.service, fee: modal.record.saleAmount, status: "Inactive" }]
+                          : courses}
                         defaultValue={modal.record?.service || ""}
                         onSelect={(course, form) => {
                           const amount = form?.elements.namedItem("saleAmount");
                           if (amount && !amount.dataset.edited)
-                            amount.value = String(courseFees[course.name] || 0);
+                            amount.value = String(course.fee ?? 0);
                         }}
                       />
+                      {coursesError && <small className="field-hint" role="alert">Could not load courses. <button type="button" onClick={() => refreshCourses().catch((error) => notify(error.message, "error"))}>Retry</button></small>}
+                      {!coursesError && courses.length === 0 && <small className="field-hint">No active courses available. Ask an administrator to add one.</small>}
                     </div>
                     {field("Lead source", "source", "text", modal.record?.source && !sources.includes(modal.record.source) ? [...sources, modal.record.source] : sources, modal.record?.source || "Facebook")}
                     {(role !== "Data Analytics Manager" || modal.record) && (
@@ -1602,9 +1640,7 @@ export default function CRMApp() {
                         required
                         defaultValue={
                           modal.record?.saleAmount ??
-                          courseFees[
-                            modal.record?.service
-                          ] ??
+                          courses.find((course) => course.name === modal.record?.service)?.fee ??
                           0
                         }
                         onInput={(e) =>
@@ -1612,7 +1648,7 @@ export default function CRMApp() {
                         }
                       />
                       <small className="field-hint">
-                        Demo course fee. Enter the agreed sale amount.
+                        Course fee. Enter the agreed sale amount.
                       </small>
                     </label>
                     <label>
@@ -1756,6 +1792,7 @@ export default function CRMApp() {
             setCallsState([]);
             setTasks([]);
             setUsers([]);
+            setCourseCatalog([]);
             setPeople([]);
             setLeaderboardPeople([]);
             setLeaderboardLoadError(false);

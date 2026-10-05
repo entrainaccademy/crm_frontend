@@ -47,35 +47,9 @@ export const priorities = ["Cool", "Hot", "Cold"];
 export const convertedStatuses = ["Won", "Converted"];
 export const closedStatuses = [...convertedStatuses, "Not Qualified", "Lost"];
 
-export const courses = [
-  { name: "Dessert Workshop", fee: 180000 },
-  { name: "One Day Shawarma and Shawai Course", fee: 150000 },
-  { name: "One Week Shawarma and Shawai Course", fee: 85000 },
-  { name: "One Day Fried Chicken Course", fee: 65000 },
-  { name: "One Week Fried Chicken Course", fee: 120000 },
-  { name: "One Week Arabian Cuisine Course", fee: 45000 },
-];
-
-export const courseFees = Object.fromEntries(
-  courses.map((course) => [course.name, course.fee]),
-);
-
-const legacyCourses = {
-  "Digital Marketing": courses[0].name,
-  "Web Development": courses[1].name,
-  "Business Consulting": courses[2].name,
-  "Brand Strategy": courses[3].name,
-  "Professional Chef Diploma": courses[0].name,
-  "Bakery & Patisserie Diploma": courses[1].name,
-  "Culinary Arts Certificate": courses[2].name,
-  "Advanced Baking Certificate": courses[3].name,
-  "Food Production & Kitchen Management": courses[4].name,
-  "Barista & Beverage Arts": courses[5].name,
-};
-
 export const normalizeLead = (lead) => {
-  const service = legacyCourses[lead?.service] || lead?.service || courses[0].name;
-  const saleAmount = Number(lead?.saleAmount ?? courseFees[service] ?? 0);
+  const service = lead?.service || "";
+  const saleAmount = Number(lead?.saleAmount ?? 0);
   return {
     ...lead,
     id: lead.id || lead.customId || lead._id,
@@ -123,6 +97,7 @@ export const access = {
     "call-reports",
     "follow-up-reports",
     "users",
+    "courses",
     "settings",
   ],
   Manager: [
@@ -160,7 +135,8 @@ export const access = {
     "call-reports",
     "follow-up-reports",
     "users",
-    "settings",
+    "courses",
+    // "settings",
   ],
   "Team Lead": [
     "dashboard",

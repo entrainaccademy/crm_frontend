@@ -1,0 +1,19 @@
+.courses-card { overflow: hidden; }
+.courses-intro { padding: 20px 22px; color: #536780; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+.courses-message { padding: 24px; color: #536780; }
+.courses-message button { margin-left: 8px; }
+.courses-table-wrap { overflow-x: auto; }
+.courses-table { width: 100%; border-collapse: collapse; min-width: 680px; text-align: left; }
+.courses-table th { padding: 14px 20px; background: #edf2f7; color: #173b60; font-size: 12px; font-weight: 700; }
+.courses-table td { padding: 16px 20px; border-top: 1px solid #e6ebf0; color: #203b59; font-size: 14px; }
+.courses-table td:first-child strong { display: block; }
+.courses-table td:first-child small { display: block; color: #71829a; margin-top: 4px; max-width: 420px; }
+.courses-status { display: inline-block; border-radius: 5px; padding: 5px 9px; font-size: 12px; font-weight: 700; }
+.courses-status.is-active { color: #166146; background: #e5f4ec; }
+.courses-status.is-inactive { color: #6e7786; background: #edf0f4; }
+.courses-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.courses-actions button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #d5e1ed; border-radius: 6px; background: #fff; color: #24496d; padding: 7px 10px; cursor: pointer; }
+.courses-actions button:hover { background: #f2f6fa; }
+.courses-actions .courses-delete { color: #b42318; border-color: #f3c7c2; }
+.courses-actions .courses-delete:hover { background: #fff4f2; }
+.courses-error { margin: 12px 0 0; color: #b42318; }
