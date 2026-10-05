@@ -138,6 +138,189 @@ const descriptions = {
   users: "Manage your people and their workspace access.",
   settings: "Make ENTRAIN CRM work for your organization.",
 };
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function CallModalFields({ modal, scopedLeads, people, assignmentNames, role, userName, courses, todayStr }) {
+  const [selectedLeadId, setSelectedLeadId] = useState(
+    modal.record?.leadId || modal.record?.customId || modal.record?.id || ""
+  );
+  const selectedLead = scopedLeads.find(
+    (l) => String(l.id) === String(selectedLeadId) || String(l.customId) === String(selectedLeadId)
+  );
+
+  const [customerName, setCustomerName] = useState(modal.record?.name || selectedLead?.name || "");
+  const [phone, setPhone] = useState(modal.record?.phone || selectedLead?.phone || "");
+  const [service, setService] = useState(modal.record?.service || selectedLead?.service || courses[0]?.name || "");
+
+  const handleLeadChange = (e) => {
+    const val = e.target.value;
+    setSelectedLeadId(val);
+    if (val === "custom") {
+      setCustomerName("");
+      setPhone("");
+    } else {
+      const match = scopedLeads.find((l) => String(l.id) === String(val) || String(l.customId) === String(val));
+      if (match) {
+        setCustomerName(match.name);
+        setPhone(match.phone || match.whatsapp || "");
+        if (match.service) setService(match.service);
+      }
+    }
+  };
+
+  const isExistingLead = Boolean(selectedLead || scopedLeads.some((l) => l.phone && phone && l.phone === phone));
+  const nowTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+  return (
+    <>
+      <label>
+        Link to existing lead
+        <select value={selectedLead ? (selectedLead.id || selectedLead.customId) : (selectedLeadId ? selectedLeadId : "custom")} onChange={handleLeadChange}>
+          <option value="custom">-- Unknown / Unsaved Number --</option>
+          {scopedLeads.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name} ({l.phone || "No phone"})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label>
+        Customer name
+        <input
+          name="name"
+          type="text"
+          required
+          value={customerName}
+          onChange={(e) => setCustomerName(e.target.value)}
+          placeholder="e.g. John Doe or Unknown Caller"
+        />
+      </label>
+
+      <label>
+        Phone number
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <input
+            name="phone"
+            type="tel"
+            required
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+91 98765 43210"
+            style={{ flex: 1 }}
+          />
+          {phone && (
+            <a
+              href={`tel:${phone}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                padding: "8px 12px",
+                background: "var(--card-bg, #f1f5f9)",
+                borderRadius: "6px",
+                textDecoration: "none",
+                fontSize: "13px",
+                color: "var(--text, #0f172a)",
+                fontWeight: 500,
+                border: "1px solid var(--border, #cbd5e1)"
+              }}
+              title="Click to dial this number directly"
+            >
+              <Phone size={14} /> Dial
+            </a>
+          )}
+        </div>
+      </label>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <label>
+          Call direction
+          <select name="direction" defaultValue={modal.record?.direction || "Outgoing"}>
+            <option value="Outgoing">Outgoing (We called)</option>
+            <option value="Incoming">Incoming (They called)</option>
+          </select>
+        </label>
+
+        <label>
+          Call status / outcome
+          <select name="callStatus" defaultValue={modal.record?.callStatus || "Answered"}>
+            <option value="Answered">Answered</option>
+            <option value="Missed">Missed</option>
+            <option value="Busy">Busy</option>
+            <option value="Voicemail">Voicemail</option>
+            <option value="Disconnected">Disconnected</option>
+          </select>
+        </label>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <label>
+          Duration
+          <input name="duration" type="text" defaultValue={modal.record?.duration || "01:30"} placeholder="mm:ss (e.g. 02:45)" />
+        </label>
+
+        <label>
+          Course / Service
+          <select name="service" value={service} onChange={(e) => setService(e.target.value)}>
+            <option value="">General Inquiry</option>
+            {courses.map((c) => (
+              <option key={c.name} value={c.name}>{c.name}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {!["Team Lead", "Sales Executive"].includes(role) && (
+        <label>
+          Assigned executive
+          <select name="assigned" defaultValue={modal.record?.assigned || userName}>
+            {people
+              .filter((p) => !assignmentNames || assignmentNames.includes(p.name))
+              .map((p) => (
+                <option key={p.id} value={p.name}>{p.name}</option>
+              ))}
+          </select>
+        </label>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <label>
+          Call date
+          <input name="callDate" type="date" defaultValue={todayStr} />
+        </label>
+        <label>
+          Call time
+          <input name="callTime" type="time" defaultValue={nowTime} />
+        </label>
+      </div>
+
+      <label>
+        Call notes & discussion summary
+        <textarea
+          name="notes"
+          rows={3}
+          placeholder="What was discussed during this call?"
+          defaultValue={modal.record?.notes || ""}
+        />
+      </label>
+
+      {!isExistingLead && (
+        <label style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", cursor: "pointer", fontSize: "13px", fontWeight: 500, color: "var(--text, #1e293b)" }}>
+          <input type="checkbox" name="createAsLead" defaultChecked={true} style={{ width: "auto", margin: 0 }} />
+          <span>Save this unknown number as a new lead in CRM</span>
+        </label>
+      )}
+    </>
+  );
+}
+
 function WorkspaceSkeleton({ page }) {
   const tablePage = ["users", "staff", "leads", "my-leads", "follow-ups", "calls", "customers"].includes(page);
   return (
@@ -553,6 +736,56 @@ export default function CRMApp() {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget));
     const todayStr = new Date().toISOString().split("T")[0];
+    if (modal.type === "call") {
+      const callData = {
+        name: data.name?.trim() || "Unknown",
+        phone: data.phone?.trim() || "",
+        direction: data.direction || "Outgoing",
+        callStatus: data.callStatus || "Answered",
+        duration: data.duration?.trim() || "01:30",
+        service: data.service || "",
+        assigned: ["Team Lead", "Sales Executive"].includes(role) ? userName : (data.assigned || userName),
+        callDate: data.callDate || new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+        callTime: data.callTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        notes: data.notes?.trim() || "",
+        leadId: modal.record?.customId || modal.record?.id || (data.leadId && data.leadId !== "custom" ? Number(data.leadId) : undefined),
+      };
+
+      const saved = await api.createCall(callData);
+      if (!saved) {
+        notify("Could not log call. Please try again.", "error");
+        return;
+      }
+      setCallsState((prev) => [saved, ...prev]);
+
+      if (data.createAsLead === "on" || data.createAsLead === "true") {
+        const selectedCourse = courses.find((course) => course.name === data.service) || courses[0];
+        const newLead = {
+          name: callData.name,
+          phone: callData.phone,
+          service: selectedCourse.name,
+          source: "Direct",
+          status: "Contacted",
+          priority: "Warm",
+          assigned: callData.assigned,
+          saleAmount: selectedCourse.fee,
+          advanceAmount: 0,
+          created: todayStr,
+          notes: callData.notes ? [{ text: callData.notes, author: userName }] : [],
+          activities: [
+            { text: `Lead created from Call Log (${callData.callStatus})`, time: "Just now" },
+          ],
+        };
+        const createdLead = await api.createLead(newLead);
+        if (createdLead) {
+          setLeads((prev) => [normalizeLead(createdLead), ...prev]);
+        }
+      }
+
+      notify("Call logged successfully");
+      setModal(null);
+      return;
+    }
     if (modal.type === "assignment") {
       if (!canAssignLead || !modal.record || !people.some((person) => person.name === data.assigned)) {
         notify("Choose an active Team Lead or Sales Executive.", "error");
@@ -1014,7 +1247,7 @@ export default function CRMApp() {
               <PageHeader
                 title={
                   page === "dashboard"
-                    ? `Good morning, ${userName.split(" ")[0]}`
+                    ? `${getGreeting()}, ${userName.split(" ")[0]}`
                     : titles[page] || "Reports"
                 }
                 description={
@@ -1043,6 +1276,14 @@ export default function CRMApp() {
                     onClick={() => setModal({ type: "lead" })}
                   >
                     <Plus size={16} /> Add lead
+                  </button>
+                ) : page === "calls" && !readOnly ? (
+                  <button
+                    className="primary"
+                    disabled={dataLoading}
+                    onClick={() => setModal({ type: "call" })}
+                  >
+                    <Plus size={16} /> Log call
                   </button>
                 ) : page === "follow-ups" && !readOnly ? (
                   <button
@@ -1152,7 +1393,16 @@ export default function CRMApp() {
               />
             )}
             {page === "calls" && (
-              <CallsPage calls={callsState} allowedNames={scopedNames} notify={notify} readOnly={readOnly} canWorkRecord={canWorkRecord} />
+              <CallsPage
+                calls={callsState}
+                leads={scopedLeads}
+                allowedNames={scopedNames}
+                notify={notify}
+                openModal={setModal}
+                navigate={navigate}
+                readOnly={readOnly}
+                canWorkRecord={canWorkRecord}
+              />
             )}
             {page === "customers" && (
               <CustomersPage leads={scopedLeads} navigate={navigate} />
@@ -1217,7 +1467,11 @@ export default function CRMApp() {
       {modal && !["logout", "delete-lead", "delete-followup"].includes(modal.type) && (
         <Modal
           title={
-            modal.type === "lead"
+            modal.type === "call"
+              ? modal.record
+                ? `Log call: ${modal.record.name || modal.record.phone}`
+                : "Log call"
+              : modal.type === "lead"
               ? modal.record
                 ? "Edit lead"
                 : "Add a new lead"
@@ -1237,7 +1491,7 @@ export default function CRMApp() {
           }
           onClose={() => setModal(null)}
         >
-          {["lead", "assignment", "followup", "user"].includes(modal.type) ? (
+          {["lead", "assignment", "followup", "user", "call"].includes(modal.type) ? (
             <form className={modal.type === "user" ? "account-form" : undefined} onSubmit={saveForm}>
               {modal.type === "user" && <div className="account-form-intro"><strong>{modal.record ? "Update account" : "Create a user account"}</strong><span>{modal.record ? "Edit the user’s details, role and access." : "Choose a role and temporary password. Share the sign-in details with the user."}</span></div>}
               <div className="form-grid">
@@ -1418,6 +1672,18 @@ export default function CRMApp() {
                     {field("Notes / purpose", "notes", "textarea")}
                   </>
                 )}
+                {modal.type === "call" && (
+                  <CallModalFields
+                    modal={modal}
+                    scopedLeads={scopedLeads}
+                    people={people}
+                    assignmentNames={assignmentNames}
+                    role={role}
+                    userName={userName}
+                    courses={courses}
+                    todayStr={todayStr}
+                  />
+                )}
                 {modal.type === "user" && (
                   <>
                     {field("Name", "name")}
@@ -1443,6 +1709,8 @@ export default function CRMApp() {
                     ? "Assign lead"
                     : modal.type === "followup"
                     ? "Save follow-up"
+                    : modal.type === "call"
+                    ? "Save call log"
                     : modal.type === "user"
                       ? modal.record ? "Save changes" : "Create user"
                       : modal.record ? "Save changes" : "Save lead"}

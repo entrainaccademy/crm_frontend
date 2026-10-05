@@ -250,18 +250,24 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
         {canDeleteLead && <button className="danger-button" onClick={() => openModal({ type: "delete-lead", record: lead })}>Delete lead</button>}
         {!readOnly && <div className="toolbar-right">
           <button
-            onClick={() =>
-              notify(
-                "Demo call ready. Telephony integration will be configured later.",
-              )
-            }
+            onClick={() => {
+              if (lead.phone) {
+                window.location.href = `tel:${lead.phone}`;
+              }
+              openModal({ type: "call", record: lead });
+            }}
           >
             <Phone size={15} /> Call
           </button>
           <button
-            onClick={() =>
-              notify("WhatsApp integration will be configured later.")
-            }
+            onClick={() => {
+              const num = (lead.whatsapp || lead.phone || "").replace(/\D/g, "");
+              if (num) {
+                window.open(`https://wa.me/${num}`, "_blank");
+              } else {
+                notify("No phone number found for WhatsApp.", "error");
+              }
+            }}
           >
             <MessageCircle size={15} /> WhatsApp
           </button>
@@ -427,11 +433,13 @@ export function FollowupsPage({
                 </button>
                 {!readOnly && canWorkRecord(r) && <button
                   aria-label="Call customer"
-                  onClick={() =>
-                    notify(
-                      "Demo call — telephony integration will be configured later.",
-                    )
-                  }
+                  title="Call & log"
+                  onClick={() => {
+                    if (r.phone) {
+                      window.location.href = `tel:${r.phone}`;
+                    }
+                    openModal({ type: "call", record: r });
+                  }}
                 >
                   <Phone size={14} />
                 </button>}
@@ -670,12 +678,21 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false, ca
     </section>
   );
 }
-export function CallsPage({ calls = [], allowedNames, notify, readOnly = false, canWorkRecord = () => true }) {
+export function CallsPage({
+  calls = [],
+  leads = [],
+  allowedNames,
+  notify,
+  openModal,
+  navigate,
+  readOnly = false,
+  canWorkRecord = () => true,
+}) {
   const [search, setSearch] = useState("");
   const rows = (calls || []).filter(
     (c) =>
       (!allowedNames || allowedNames.includes(c.assigned)) &&
-      ((c.name || "") + (c.phone || "") + (c.assigned || ""))
+      ((c.name || "") + (c.phone || "") + (c.assigned || "") + (c.notes || ""))
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
@@ -703,16 +720,68 @@ export function CallsPage({ calls = [], allowedNames, notify, readOnly = false, 
           <SearchInput
             value={search}
             onChange={setSearch}
-            placeholder="Search calls…"
+            placeholder="Search calls, numbers, notes…"
           />
-          <span className="muted">Call records</span>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <span className="muted">Call records</span>
+            {!readOnly && openModal && (
+              <button
+                className="primary"
+                onClick={() => openModal({ type: "call" })}
+              >
+                <Plus size={14} /> Log call
+              </button>
+            )}
+          </div>
         </div>
         <DataTable
           rows={rows}
           columns={[
-            { key: "name", label: "Customer" },
+            {
+              key: "name",
+              label: "Customer / Number",
+              render: (r) => {
+                const lead = (leads || []).find(
+                  (l) => String(l.id) === String(r.leadId) || (l.phone && r.phone && l.phone === r.phone),
+                );
+                return (
+                  <div>
+                    <div style={{ fontWeight: 500 }}>
+                      {lead && navigate ? (
+                        <button
+                          className="text-button"
+                          style={{ padding: 0, fontWeight: 600, color: "var(--primary, #2563eb)", textAlign: "left" }}
+                          onClick={() => navigate("leads/" + lead.id)}
+                        >
+                          {r.name || lead.name}
+                        </button>
+                      ) : (
+                        <span>{r.name || "Unknown Caller"}</span>
+                      )}
+                    </div>
+                    {lead ? (
+                      <small className="muted" style={{ fontSize: "11px" }}>Linked Lead #{lead.id}</small>
+                    ) : (
+                      <small style={{ color: "#b45309", fontSize: "11px", fontWeight: 500 }}>Unsaved Number</small>
+                    )}
+                  </div>
+                );
+              },
+            },
             { key: "assigned", label: "Assigned to" },
-            { key: "phone", label: "Phone" },
+            {
+              key: "phone",
+              label: "Phone",
+              render: (r) => r.phone ? (
+                <a
+                  href={`tel:${r.phone}`}
+                  style={{ color: "inherit", textDecoration: "none" }}
+                  title="Click to dial"
+                >
+                  {r.phone}
+                </a>
+              ) : "—",
+            },
             { key: "direction", label: "Direction" },
             { key: "callDate", label: "Date" },
             { key: "callTime", label: "Time" },
@@ -723,34 +792,54 @@ export function CallsPage({ calls = [], allowedNames, notify, readOnly = false, 
               render: (r) => <StatusBadge status={r.callStatus} />,
             },
             {
-              key: "recording",
-              label: "Recording",
-              render: (r) => (
-                <button
-                  disabled={r.callStatus === "Missed"}
-                  onClick={() =>
-                    notify(
-                      "Call recording audio will be available after telephony integration.",
-                    )
-                  }
-                >
-                  <Play size={12} /> Play recording
-                </button>
-              ),
+              key: "notes",
+              label: "Notes",
+              render: (r) => r.notes ? (
+                <span title={r.notes} style={{ maxWidth: "150px", display: "inline-block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.notes}
+                </span>
+              ) : <span className="muted">—</span>,
             },
             !readOnly && {
               key: "action",
               label: "Action",
-              render: (r) => canWorkRecord(r) ? (
-                <button
-                  aria-label={"Call " + (r.name || "customer")}
-                  onClick={() =>
-                    notify("Call integration is ready.")
-                  }
-                >
-                  <Phone size={14} />
-                </button>
-              ) : null,
+              render: (r) => {
+                const lead = (leads || []).find(
+                  (l) => String(l.id) === String(r.leadId) || (l.phone && r.phone && l.phone === r.phone),
+                );
+                return canWorkRecord(r) ? (
+                  <div className="row-actions" style={{ display: "flex", gap: "6px" }}>
+                    <button
+                      aria-label={"Call " + (r.name || "customer")}
+                      title="Call & log notes"
+                      onClick={() => {
+                        if (r.phone) window.location.href = `tel:${r.phone}`;
+                        if (openModal) openModal({ type: "call", record: r });
+                      }}
+                    >
+                      <Phone size={14} />
+                    </button>
+                    {!lead && openModal && (
+                      <button
+                        title="Add this unsaved number as a new lead"
+                        onClick={() =>
+                          openModal({
+                            type: "lead",
+                            record: {
+                              name: r.name && r.name !== "Unknown" && r.name !== "Unknown Caller" ? r.name : "",
+                              phone: r.phone || "",
+                              service: r.service || "",
+                            },
+                          })
+                        }
+                        style={{ fontSize: "11px", padding: "3px 7px" }}
+                      >
+                        + Lead
+                      </button>
+                    )}
+                  </div>
+                ) : null;
+              },
             },
           ].filter(Boolean)}
         />
