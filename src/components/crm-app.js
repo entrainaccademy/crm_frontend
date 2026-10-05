@@ -850,9 +850,9 @@ export default function CRMApp() {
         saleAmount < 0 ||
         !Number.isFinite(advanceAmount) ||
         advanceAmount < 0 ||
-        advanceAmount > saleAmount
+        (saleAmount > 0 && advanceAmount > saleAmount)
       ) {
-        notify("Advance amount must be between ₹0 and the sale amount", "error");
+        notify("Enter valid amounts. If a sale amount is set, the advance cannot exceed it.", "error");
         return;
       }
       const newNote = String(data.initialNote || "").trim();
@@ -1555,11 +1555,6 @@ export default function CRMApp() {
                           ? [...courses, { name: modal.record.service, fee: modal.record.saleAmount, status: "Inactive" }]
                           : courses}
                         defaultValue={modal.record?.service || ""}
-                        onSelect={(course, form) => {
-                          const amount = form?.elements.namedItem("saleAmount");
-                          if (amount && !amount.dataset.edited)
-                            amount.value = String(course.fee ?? 0);
-                        }}
                       />
                       {coursesError && <small className="field-hint" role="alert">Could not load courses. <button type="button" onClick={() => refreshCourses().catch((error) => notify(error.message, "error"))}>Retry</button></small>}
                       {!coursesError && courses.length === 0 && <small className="field-hint">No active courses available. Ask an administrator to add one.</small>}
@@ -1637,18 +1632,10 @@ export default function CRMApp() {
                         type="number"
                         min="0"
                         step="1"
-                        required
-                        defaultValue={
-                          modal.record?.saleAmount ??
-                          courses.find((course) => course.name === modal.record?.service)?.fee ??
-                          0
-                        }
-                        onInput={(e) =>
-                          (e.currentTarget.dataset.edited = "true")
-                        }
+                        defaultValue={modal.record?.saleAmount ?? ""}
                       />
                       <small className="field-hint">
-                        Course fee. Enter the agreed sale amount.
+                        Optional. Enter the agreed amount when known.
                       </small>
                     </label>
                     <label>
@@ -1658,8 +1645,7 @@ export default function CRMApp() {
                         type="number"
                         min="0"
                         step="1"
-                        required
-                        defaultValue={modal.record?.advanceAmount ?? 0}
+                        defaultValue={modal.record?.advanceAmount ?? ""}
                       />
                     </label>
                     {field("Add note", "initialNote", "textarea")}
