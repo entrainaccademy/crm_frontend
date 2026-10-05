@@ -1216,6 +1216,22 @@ td small {
 .row-actions .lead-action-icon.danger-button:hover {
   background: #fff4f4;
 }
+.lead-phone-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid #cfe3d6;
+  border-radius: 6px;
+  background: #f1faf4;
+  color: #1f7a45;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lead-phone-call:hover {
+  background: #e2f4e8;
+}
 .danger-button {
   border-color: #ebc8c8;
   color: #a33d3d;
@@ -4237,10 +4253,28 @@ textarea {
   }
   .navbar .mobile-brand {
     display: flex;
+    flex: 0 1 150px;
+    min-width: 0;
+    padding: 0;
+    background: transparent;
+  }
+  .navbar .mobile-brand .brand-full {
+    width: 100%;
+    max-height: 44px;
+  }
+  /* Collapse search to an icon so the full logo has room; it expands on focus */
+  .navbar .global-search {
     flex: none;
-    width: 142px;
-    padding: 5px 7px;
-    border-radius: 5px;
+    margin-left: auto;
+    width: 36px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .navbar .global-search:focus-within {
+    width: auto;
+    padding: 0 12px;
+    border: 1px solid #d5dfeb;
     background: #fff;
   }
   .main {

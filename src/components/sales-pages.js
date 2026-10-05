@@ -67,6 +67,11 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
       (!dateFrom || l.created >= dateFrom) &&
       (!dateTo || l.created <= dateTo),
   );
+  const callLead = (event, lead) => {
+    event.stopPropagation();
+    if (lead.phone) window.location.href = `tel:${lead.phone}`;
+    openModal({ type: "call", record: lead });
+  };
   return (
     <section className="card leads-table-card">
       <div className="table-toolbar">
@@ -171,7 +176,18 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
               </div>
             ),
           },
-          { key: "phone", label: "Phone" },
+          {
+            key: "phone",
+            label: "Phone",
+            render: (r) =>
+              readOnly || !r.phone ? (
+                r.phone
+              ) : (
+                <button className="lead-phone-call" title="Call & log" aria-label={`Call ${r.name}`} onClick={(event) => callLead(event, r)}>
+                  <Phone size={14} aria-hidden="true" /> {r.phone}
+                </button>
+              ),
+          },
           { key: "source", label: "Source" },
           { key: "service", label: "Course" },
           {
@@ -201,6 +217,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
                   event.stopPropagation();
                   navigate("leads/" + r.id);
                 }}><ArrowUpRight size={16} aria-hidden="true" /></button>
+                {!readOnly && <button className="lead-action-icon" aria-label={`Call ${r.name}`} title="Call & log" onClick={(event) => callLead(event, r)}><Phone size={16} aria-hidden="true" /></button>}
                 {canEditLead(r) && <button className="lead-action-icon" aria-label={`Edit ${r.name}`} title="Edit lead" onClick={(event) => {
                   event.stopPropagation();
                   openModal({ type: "lead", record: r });
