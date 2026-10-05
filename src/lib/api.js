@@ -21,7 +21,7 @@ async function request(endpoint, options = {}) {
     return json;
   } catch (err) {
     console.warn(`API request to ${endpoint} failed:`, err.message);
-    return { success: false, error: err.message };
+    return { success: false, error: "Could not connect to the server. Please try again." };
   }
 }
 

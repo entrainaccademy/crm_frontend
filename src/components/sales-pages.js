@@ -112,7 +112,13 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
       )}
       <DataTable
         rows={rows.slice((page - 1) * 8, page * 8)}
-        onRow={(l) => navigate("leads/" + l.id)}
+        onRow={(lead) => {
+          if (canEditLead(lead)) {
+            openModal({ type: "lead", record: lead });
+          } else {
+            navigate("leads/" + lead.id);
+          }
+        }}
         columns={[
           {
             key: "name",
@@ -153,6 +159,10 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
             label: "Actions",
             render: (r) => (
               <div className="row-actions">
+                <button className="lead-action-icon" aria-label={`View ${r.name}`} title="View lead details" onClick={(event) => {
+                  event.stopPropagation();
+                  navigate("leads/" + r.id);
+                }}><ArrowUpRight size={16} aria-hidden="true" /></button>
                 {canEditLead(r) && <button className="lead-action-icon" aria-label={`Edit ${r.name}`} title="Edit lead" onClick={(event) => {
                   event.stopPropagation();
                   openModal({ type: "lead", record: r });

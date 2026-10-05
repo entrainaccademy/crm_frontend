@@ -165,7 +165,7 @@ export function LeaderboardRow({ person, index }) {
   );
 }
 
-export function Leaderboard({ people = [], navigate }) {
+export function Leaderboard({ people = [], navigate, loadError = false, salespeopleCount = 0, onAddSalesperson }) {
   const ranked = rankExecutives(people);
   return (
     <section className="card leaderboard-card">
@@ -179,7 +179,16 @@ export function Leaderboard({ people = [], navigate }) {
         Performance and goal tracking for salespeople.
       </p>
       {ranked.length === 0 ? (
-        <div className="empty-inline">No executive records found.</div>
+        <div className="empty-inline">
+          {loadError
+            ? "Could not load the sales leaderboard. Refresh the page to try again."
+            : salespeopleCount > 0
+              ? "No salespeople are currently shown on the leaderboard."
+              : "No salespeople added yet."}
+          {!loadError && salespeopleCount === 0 && onAddSalesperson && (
+            <button type="button" onClick={onAddSalesperson}>Add salesperson</button>
+          )}
+        </div>
       ) : (
         ranked.slice(0, 5).map((p, i) => (
           <LeaderboardRow key={p.id || i} person={p} index={i} />
@@ -198,6 +207,9 @@ export default function Dashboard({
   ownAccount,
   leads = [],
   people = [],
+  leaderboardLoadError = false,
+  salespeopleCount = 0,
+  onAddSalesperson,
   staff = [],
   followups = [],
   calls = [],
@@ -285,7 +297,7 @@ export default function Dashboard({
               Review employee tasks <ArrowRight size={14} />
             </button>
           </section>
-          <Leaderboard people={people} navigate={navigate} />
+          <Leaderboard people={people} navigate={navigate} loadError={leaderboardLoadError} salespeopleCount={salespeopleCount} onAddSalesperson={onAddSalesperson} />
         </div>
       </>
     );
@@ -361,7 +373,7 @@ export default function Dashboard({
             </span>
           </div>
         </section>
-        <Leaderboard people={people} navigate={navigate} />
+        <Leaderboard people={people} navigate={navigate} loadError={leaderboardLoadError} salespeopleCount={salespeopleCount} onAddSalesperson={onAddSalesperson} />
       </div>
     </>
   );

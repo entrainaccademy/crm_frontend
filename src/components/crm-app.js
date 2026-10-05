@@ -206,6 +206,7 @@ export default function CRMApp() {
     [tasks, setTasks] = useState([]),
     [people, setPeople] = useState([]),
     [leaderboardPeople, setLeaderboardPeople] = useState([]),
+    [leaderboardLoadError, setLeaderboardLoadError] = useState(false),
     [users, setUsers] = useState([]),
     [dataLoading, setDataLoading] = useState(true),
     [usersError, setUsersError] = useState(false),
@@ -337,9 +338,32 @@ export default function CRMApp() {
         if (tasksData && Array.isArray(tasksData)) {
           setTasks(tasksData);
         }
-        if (Array.isArray(leaderboardData)) {
+        if (Array.isArray(leaderboardData) && leaderboardData.length > 0) {
+          setLeaderboardPeople(leaderboardData);
+        } else if (Array.isArray(usersData) && Array.isArray(leadsData)) {
+          const eligibleUsers = usersData.filter((user) =>
+            ["Sales Executive", "Team Lead"].includes(user.role) &&
+            user.status === "Active" && user.leaderboardVisible !== false
+          );
+          const startTime = new Date(`${dateKey(monthStart)}T00:00:00.000Z`).getTime();
+          const endTime = new Date(`${dateKey(monthEnd)}T23:59:59.999Z`).getTime();
+          const fallback = eligibleUsers.map((user) => {
+            const converted = leadsData.filter((lead) => {
+              if (lead.assigned !== user.name || !convertedStatuses.includes(lead.status)) return false;
+              const conversionTime = new Date(lead.convertedAt || lead.updatedAt).getTime();
+              return conversionTime >= startTime && conversionTime <= endTime;
+            });
+            return {
+              ...user,
+              sales: converted.reduce((total, lead) => total + (Number(lead.saleAmount) || 0), 0),
+              conversions: converted.length,
+            };
+          });
+          setLeaderboardPeople(fallback);
+        } else if (Array.isArray(leaderboardData)) {
           setLeaderboardPeople(leaderboardData);
         }
+        setLeaderboardLoadError(!Array.isArray(leaderboardData) && !(Array.isArray(usersData) && Array.isArray(leadsData)));
         if (Array.isArray(usersData)) {
           const mappedUsers = usersData.map((u) => ({
               ...u,
@@ -433,7 +457,12 @@ export default function CRMApp() {
     const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
     const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     const updated = await api.getLeaderboard({ startDate: dateKey(monthStart), endDate: dateKey(monthEnd) });
-    if (Array.isArray(updated)) setLeaderboardPeople(updated);
+    if (Array.isArray(updated)) {
+      setLeaderboardPeople(updated);
+      setLeaderboardLoadError(false);
+    } else {
+      setLeaderboardLoadError(true);
+    }
   };
   const updateLead = async (lead, { silent = false } = {}) => {
     if (!canEditLead(lead)) { notify("You can only update your assigned leads.", "error"); return false; }
@@ -1051,6 +1080,9 @@ export default function CRMApp() {
                 role={role}
                 leads={scopedLeads}
                 people={leaderboardPeople}
+                leaderboardLoadError={leaderboardLoadError}
+                salespeopleCount={people.length}
+                onAddSalesperson={canManageAccounts ? () => setModal({ type: "user", context: "leaderboard" }) : null}
                 viewerName={userName}
                 ownAccount={authUser}
                 staff={users}
@@ -1458,6 +1490,7 @@ export default function CRMApp() {
             setUsers([]);
             setPeople([]);
             setLeaderboardPeople([]);
+            setLeaderboardLoadError(false);
             setDataLoading(true);
           }}
         />
