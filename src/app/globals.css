@@ -3475,29 +3475,28 @@ textarea {
 .leads-table-card .badge-not-qualified {
   color: #943d3d;
 }
-.followups-table-card .table-scroll tbody tr.followup-status-row {
+.followups-table-card .table-scroll tbody tr.followup-assignee-row {
   background: var(--followup-row-bg);
+  transition: background-color 0.15s ease;
 }
-.followups-table-card .table-scroll tbody tr.followup-status-row:hover {
+.followups-table-card .table-scroll tbody tr.followup-assignee-row:hover {
   background: var(--followup-row-hover);
 }
-.followups-table-card .table-scroll tbody tr.followup-status-row td:first-child {
+.followups-table-card .table-scroll tbody tr.followup-assignee-row td:first-child {
   box-shadow: inset 4px 0 var(--followup-row-accent);
 }
-.followup-status-scheduled {
-  --followup-row-bg: #fffbf2;
-  --followup-row-hover: #fff4e3;
-  --followup-row-accent: #c99544;
+.followup-assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
 }
-.followup-status-overdue {
-  --followup-row-bg: #fff7f7;
-  --followup-row-hover: #fcecec;
-  --followup-row-accent: #cf7777;
-}
-.followup-status-completed {
-  --followup-row-bg: #f5fbf7;
-  --followup-row-hover: #eaf7ee;
-  --followup-row-accent: #56a77c;
+.followup-assignee i {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--followup-row-accent, #aab8c6);
 }
 .followups-table-card .badge-scheduled {
   color: #81541b;

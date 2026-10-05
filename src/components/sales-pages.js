@@ -30,6 +30,21 @@ import {
   EmptyState,
 } from "./ui";
 import { statuses, sources, priorities, closedStatuses, calls, money } from "@/lib/data";
+const followupAssigneePalette = [
+  ["#f8f5ff", "#f0eafd", "#9a82cc"],
+  ["#f3f8ff", "#e9f2ff", "#6b9ed0"],
+  ["#fff7f1", "#ffede0", "#d99a70"],
+  ["#f1faf5", "#e3f4ea", "#6aaf88"],
+  ["#fff5f7", "#fde9ef", "#d68ca4"],
+  ["#fffbee", "#fff4d8", "#c8aa5b"],
+  ["#f0fafb", "#e1f4f6", "#6bb4be"],
+  ["#f5f7fa", "#e8edf3", "#879eb5"],
+];
+const followupAssigneeColor = (index) => {
+  if (index < followupAssigneePalette.length) return followupAssigneePalette[index];
+  const hue = Math.round((index * 137.5) % 360);
+  return [`hsl(${hue} 55% 96%)`, `hsl(${hue} 55% 91%)`, `hsl(${hue} 40% 58%)`];
+};
 export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = false, canEditLead = () => true, canDeleteLead = false, canAssignLead = false }) {
   const [search, setSearch] = useState(""),
     [filters, setFilters] = useState(false),
@@ -408,6 +423,11 @@ export function FollowupsPage({
             ? f.date > todayStr
             : f.date < todayStr),
   );
+  const assigneeColors = new Map(
+    [...new Set(followups.map((followup) => followup.assigned).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b))
+      .map((name, index) => [name, followupAssigneeColor(index)]),
+  );
   const pageSize = 8;
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -429,7 +449,15 @@ export function FollowupsPage({
       </div>
       <DataTable
         rows={rows.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
-        rowClassName={(followup) => `followup-status-row followup-status-${followupStatus(followup).toLowerCase()}`}
+        rowClassName={() => "followup-assignee-row"}
+        rowStyle={(followup) => {
+          const [background, hover, accent] = assigneeColors.get(followup.assigned) || ["#f8fafc", "#eef2f6", "#aab8c6"];
+          return {
+            "--followup-row-bg": background,
+            "--followup-row-hover": hover,
+            "--followup-row-accent": accent,
+          };
+        }}
         columns={[
           {
             key: "name",
@@ -437,7 +465,7 @@ export function FollowupsPage({
             render: (r) => <strong>{r.name}</strong>,
           },
           { key: "phone", label: "Phone" },
-          { key: "assigned", label: "Assigned to" },
+          { key: "assigned", label: "Assigned to", render: (r) => <span className="followup-assignee"><i aria-hidden="true" />{r.assigned || "Unassigned"}</span> },
           { key: "date", label: "Follow-up date" },
           { key: "time", label: "Time" },
           { key: "purpose", label: "Purpose" },

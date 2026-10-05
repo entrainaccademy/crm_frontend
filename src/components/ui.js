@@ -152,7 +152,7 @@ export function EmptyState({
     </div>
   );
 }
-export function DataTable({ columns, rows, onRow, rowClassName }) {
+export function DataTable({ columns, rows, onRow, rowClassName, rowStyle }) {
   return (
     <div
       className="table-scroll"
@@ -185,6 +185,7 @@ export function DataTable({ columns, rows, onRow, rowClassName }) {
               }}
               onClick={() => onRow?.(row)}
               className={[onRow && "clickable", rowClassName?.(row)].filter(Boolean).join(" ")}
+              style={rowStyle?.(row)}
             >
               {columns.map((c) => (
                 <td key={c.key}>{c.render ? c.render(row, i) : row[c.key]}</td>
