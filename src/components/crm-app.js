@@ -502,16 +502,26 @@ export default function CRMApp() {
         monthStart.setDate(1);
         const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
         const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-        const [leadsData, followupsData, callsData, tasksData, usersData, leaderboardData, coursesData] =
-          await Promise.all([
-            api.getLeads(),
-            api.getFollowups(),
-            api.getCalls(),
-            api.getTasks(),
-            api.getUsers(),
-            api.getLeaderboard({ startDate: dateKey(monthStart), endDate: dateKey(monthEnd) }),
-            api.getCourses(["Super Admin", "Data Analytics Manager"].includes(authUser.role)),
-          ]);
+        const fetchAll = () => Promise.all([
+          api.getLeads(),
+          api.getFollowups(),
+          api.getCalls(),
+          api.getTasks(),
+          api.getUsers(),
+          api.getLeaderboard({ startDate: dateKey(monthStart), endDate: dateKey(monthEnd) }),
+          api.getCourses(["Super Admin", "Data Analytics Manager"].includes(authUser.role)),
+        ]);
+        const canListUsers = ["Super Admin", "Data Analytics Manager", "Team Lead"].includes(authUser.role);
+        let results = await fetchAll();
+        // Requests right after sign-in can fail transiently; retry instead of leaving the workspace empty.
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          const [l, , , , u, lb] = results;
+          if (cancelled || (Array.isArray(l) && Array.isArray(lb) && (!canListUsers || Array.isArray(u)))) break;
+          await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
+          if (cancelled) return;
+          results = await fetchAll();
+        }
+        const [leadsData, followupsData, callsData, tasksData, usersData, leaderboardData, coursesData] = results;
         if (cancelled) return;
         if (Array.isArray(coursesData)) {
           setCourseCatalog(coursesData);
