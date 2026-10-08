@@ -394,6 +394,7 @@ export default function CRMApp() {
     [leaderboardPeople, setLeaderboardPeople] = useState([]),
     [leaderboardLoadError, setLeaderboardLoadError] = useState(false),
     [users, setUsers] = useState([]),
+    [formSaving, setFormSaving] = useState(false),
     [courseCatalog, setCourseCatalog] = useState([]),
     [coursesError, setCoursesError] = useState(false),
     [courseEditor, setCourseEditor] = useState(null),
@@ -413,6 +414,7 @@ export default function CRMApp() {
     [userNotifications, setUserNotifications] = useState([]),
     [hydrated, setHydrated] = useState(false);
   const notificationButtonRef = useRef(null);
+  const formSavingRef = useRef(false);
   const notificationPanelRef = useRef(null);
   const accountButtonRef = useRef(null);
   const accountPanelRef = useRef(null);
@@ -768,7 +770,21 @@ export default function CRMApp() {
   }
   async function saveForm(e) {
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.currentTarget));
+    if (formSavingRef.current) return;
+    const form = e.currentTarget;
+    if (!form.dataset.creationRequestId) form.dataset.creationRequestId = crypto.randomUUID();
+    const creationRequestId = form.dataset.creationRequestId;
+    formSavingRef.current = true;
+    setFormSaving(true);
+    try {
+      await saveFormOnce(form, creationRequestId);
+    } finally {
+      formSavingRef.current = false;
+      setFormSaving(false);
+    }
+  }
+  async function saveFormOnce(form, creationRequestId) {
+    const data = Object.fromEntries(new FormData(form));
     const todayStr = new Date().toISOString().split("T")[0];
     if (modal.type === "call") {
       const callData = {
@@ -809,6 +825,7 @@ export default function CRMApp() {
           assigned: callData.assigned,
           saleAmount: selectedCourse.fee,
           advanceAmount: 0,
+          creationRequestId: `${creationRequestId}:call`,
           created: todayStr,
           notes: callData.notes ? [{ text: callData.notes, author: userName }] : [],
           activities: [
@@ -817,7 +834,8 @@ export default function CRMApp() {
         };
         const createdLead = await api.createLead(newLead);
         if (createdLead) {
-          setLeads((prev) => [normalizeLead(createdLead), ...prev]);
+          setLeads((prev) => prev.some((item) => String(item.id) === String(createdLead.id || createdLead.customId))
+            ? prev : [normalizeLead(createdLead), ...prev]);
         }
       }
 
@@ -874,6 +892,7 @@ export default function CRMApp() {
         priority: role === "Data Analytics Manager" && !modal.record ? "" : data.priority,
         saleAmount,
         advanceAmount,
+        ...(!modal.record ? { creationRequestId } : {}),
         id: modal.record?.id || Date.now(),
         created: modal.record?.created || todayStr,
         date: role === "Data Analytics Manager" && !modal.record ? "" : (data.date ?? modal.record?.date ?? todayStr),
@@ -902,7 +921,8 @@ export default function CRMApp() {
       } else {
         const saved = await api.createLead(lead);
         if (!saved) { notify("Could not add lead. Please try again.", "error"); return; }
-        setLeads([normalizeLead(saved), ...leads]);
+        setLeads((prev) => prev.some((item) => String(item.id) === String(saved.id || saved.customId))
+          ? prev : [normalizeLead(saved), ...prev]);
       }
       const updatedFollowups = await api.getFollowups();
       if (Array.isArray(updatedFollowups)) {
@@ -1736,8 +1756,8 @@ export default function CRMApp() {
                 <button type="button" onClick={() => setModal(null)}>
                   Cancel
                 </button>
-                <button className="primary" type="submit">
-                  {modal.type === "assignment"
+                <button className="primary" type="submit" disabled={formSaving}>
+                  {formSaving ? "Saving…" : modal.type === "assignment"
                     ? "Assign lead"
                     : modal.type === "followup"
                     ? "Save follow-up"
