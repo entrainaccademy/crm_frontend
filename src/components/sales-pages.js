@@ -46,6 +46,8 @@ const followupAssigneeColor = (index) => {
   const hue = Math.round((index * 137.5) % 360);
   return [`hsl(${hue} 55% 96%)`, `hsl(${hue} 55% 91%)`, `hsl(${hue} 40% 58%)`];
 };
+const PAGE_SIZE = 10;
+
 export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = false, canEditLead = () => true, canDeleteLead = false, canAssignLead = false }) {
   const [search, setSearch] = useState(""),
     [filters, setFilters] = useState(false),
@@ -153,7 +155,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
         </div>
       )}
       <DataTable
-        rows={rows.slice((page - 1) * 8, page * 8)}
+        rows={rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)}
         rowClassName={(lead) => `lead-status-row lead-status-${(lead.status || "no-status").toLowerCase().replaceAll(" ", "-")}`}
         onRow={(lead) => {
           if (canEditLead(lead)) {
@@ -233,8 +235,8 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
       />
       <div className="pagination">
         <span>
-          Showing {rows.length ? (page - 1) * 8 + 1 : 0}–
-          {Math.min(page * 8, rows.length)} of {rows.length} leads
+          Showing {rows.length ? (page - 1) * PAGE_SIZE + 1 : 0}–
+          {Math.min(page * PAGE_SIZE, rows.length)} of {rows.length} leads
         </span>
         <div>
           <button
@@ -245,11 +247,11 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
             <ChevronLeft size={15} />
           </button>
           <span>
-            {page} / {Math.max(1, Math.ceil(rows.length / 8))}
+            {page} / {Math.max(1, Math.ceil(rows.length / PAGE_SIZE))}
           </span>
           <button
             aria-label="Next page"
-            disabled={page * 8 >= rows.length}
+            disabled={page * PAGE_SIZE >= rows.length}
             onClick={() => setPage(page + 1)}
           >
             <ChevronRight size={15} />

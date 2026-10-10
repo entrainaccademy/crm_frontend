@@ -4706,3 +4706,38 @@ textarea {
   background: #065f54;
 }
 
+/* Compact layout for laptops and scaled displays (125-150% Windows scaling). */
+@media (min-width: 761px) and (max-width: 1500px) {
+  :root { 
+    --sidebar: 212px;
+    --header: 62px;
+  }
+  .sidebar-brand {
+    max-width: 140px;
+  }
+  .nav-item {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    font-size: 13px;
+  }
+  .main h1 {
+    font-size: 24px;
+  }
+  .main .table-scroll th,
+  .main .table-scroll td {
+    padding: 9px 11px;
+    font-size: 12.5px;
+  }
+  .main .table-scroll .person-cell {
+    gap: 8px;
+  }
+  .main .table-scroll .avatar {
+    width: 28px;
+    height: 28px;
+  }
+  .lead-phone-call {
+    padding: 3px 7px;
+    font-size: 12.5px;
+  }
+}
+
