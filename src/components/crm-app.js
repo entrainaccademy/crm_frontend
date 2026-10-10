@@ -1708,7 +1708,7 @@ export default function CRMApp() {
                   page === "dashboard" ? (
                     <span className="dashboard-greeting">
                       <span className="greeting-prefix">{getGreeting()},</span>{" "}
-                      <br className="greeting-br" />
+                      
                       <span className="greeting-name">{userName.split(" ")[0]}</span>
                     </span>
                   ) : (
