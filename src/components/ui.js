@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import Image from "next/image";
-import { X, Search, ArrowUpRight, Download } from "lucide-react";
+import { X, Search, ArrowUpRight, Download, Calendar } from "lucide-react";
 export function ExportMenu({ onExport, label = "Export" }) {
   return (
     <label className="export-menu">
@@ -60,10 +60,26 @@ export function StatCard({
   change,
   icon: Icon,
   negative = false,
-  showComparison = true,
+  showComparison = false,
+  onClick,
 }) {
   return (
-    <div className="stat-card">
+    <div
+      className={`stat-card${onClick ? " clickable" : ""}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick(e);
+              }
+            }
+          : undefined
+      }
+    >
       <div className="stat-label">
         {label}
         {Icon && <Icon size={16} />}
@@ -71,10 +87,12 @@ export function StatCard({
       <strong>{value}</strong>
       {(change || showComparison) && (
         <div className="stat-change">
-          <span className={negative ? "negative" : ""}>
-            <ArrowUpRight size={12} />
-            {change || "12.8%"}
-          </span>
+          {change && (
+            <span className={negative ? "negative" : ""}>
+              <ArrowUpRight size={12} />
+              {change}
+            </span>
+          )}
           {showComparison && <small>vs. previous period</small>}
         </div>
       )}
@@ -108,13 +126,17 @@ export function FilterDropdown({ value, onChange, options, label, allLabel = lab
     </select>
   );
 }
-export function DateRangeFilter({ value, onChange }) {
+export function DateRangeFilter({ value = "This Month", onChange }) {
+  const options = ["Today", "This Week", "This Month", "Custom"];
   return (
     <div className="date-filter">
-      <div className="segments">
-        {["Today", "This Week", "This Month", "Custom"].map((x) => (
+      <div className="filter-chips-bar" role="tablist" aria-label="Filter period">
+        {options.map((x) => (
           <button
-            className={value === x ? "selected" : ""}
+            type="button"
+            role="tab"
+            aria-selected={value === x}
+            className={`filter-chip${value === x ? " active" : ""}`}
             key={x}
             onClick={() => onChange(x)}
           >

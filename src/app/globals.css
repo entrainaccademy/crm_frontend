@@ -101,6 +101,7 @@ h1 {
   letter-spacing: -0.85px;
   line-height: 1.4;
   font-weight: 650;
+  font-family: var(--font-geist-sans), var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 h2 {
   font-size: 13px;
@@ -503,6 +504,23 @@ small {
   margin-top: 6px;
   line-height: 1.6;
 }
+.dashboard-greeting {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-family: var(--font-poppins), "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.3px;
+}
+.greeting-br {
+  display: none;
+}
+.greeting-prefix,
+.greeting-name {
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: inherit;
+}
 .header-actions {
   display: flex;
   gap: 9px;
@@ -524,6 +542,44 @@ small {
 }
 .period-row > .muted {
   font-size: 9px;
+}
+.date-filter {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.filter-chips-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid #dce4ef;
+  padding: 4px;
+  border-radius: 9999px;
+  box-shadow: 0 1px 4px rgba(32, 59, 132, 0.05);
+}
+.filter-chip {
+  border: 0;
+  background: transparent;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 550;
+  color: #5d6f82;
+  border-radius: 9999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  min-height: 30px;
+}
+.filter-chip:hover:not(.active) {
+  background: #f0f4f9;
+  color: #1a3556;
+}
+.filter-chip.active {
+  background: #203b84;
+  color: #ffffff;
+  font-weight: 650;
+  box-shadow: 0 2px 5px rgba(32, 59, 132, 0.25);
 }
 .segments {
   display: inline-flex;
@@ -584,6 +640,17 @@ small {
   border-radius: 8px;
   padding: 16px 17px 14px;
   box-shadow: 0 2px 3px #1d293103;
+}
+.stat-card.clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.stat-card.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+.stat-card.clickable:active {
+  transform: translateY(0);
 }
 .stat-label {
   display: flex;
@@ -2078,7 +2145,9 @@ dd {
     margin-bottom: 20px;
   }
   h1 {
-    font-size: 22px;
+    font-size: 18px;
+    letter-spacing: -0.4px;
+    line-height: 1.3;
   }
   .page-header p {
     font-size: 10px;
@@ -4741,3 +4810,71 @@ textarea {
   }
 }
 
+/* Mobile typography for page headers and greetings */
+@media (max-width: 760px) {
+  .page-header h1,
+  .main h1,
+  h1 {
+    font-size: 18px !important;
+    letter-spacing: -0.4px;
+    line-height: 1.3;
+  }
+  .dashboard-greeting {
+    display: block !important;
+    line-height: 1.25;
+  }
+  .greeting-br {
+    display: block !important;
+  }
+  .dashboard-period-row,
+  .period-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px;
+  }
+  .date-filter {
+    width: 100%;
+  }
+  .filter-chips-bar {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: 3px;
+    gap: 4px;
+    border-radius: 9999px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .filter-chips-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .filter-chip {
+    flex: 1 1 auto;
+    text-align: center;
+    padding: 7px 10px;
+    font-size: 11.5px;
+    border-radius: 9999px;
+    min-height: 32px;
+  }
+  .custom-dates {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .custom-dates input {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header h1,
+  .main h1,
+  h1 {
+    font-size: 16px !important;
+    letter-spacing: -0.3px;
+    line-height: 1.25;
+  }
+}

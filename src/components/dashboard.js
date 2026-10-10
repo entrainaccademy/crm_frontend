@@ -230,13 +230,15 @@ export default function Dashboard({
   const totalTargetSales = people.reduce((sum, p) => sum + (Number(p.target) || 0), 0) || 3600000;
   const overallAchievement = Math.round((totalAchievedSales / Math.max(1, totalTargetSales)) * 100);
 
+  const leadsTarget = role === "Sales Executive" ? "my-leads" : "leads";
+
   const stats = [
-    ["Total leads", totalLeads, totalLeads > 0 ? `${totalLeads} active` : "No leads", Users],
-    ["Added today", leadsAddedToday, leadsAddedToday > 0 ? `${leadsAddedToday} added` : "None added", UserPlus],
-    ["Follow-ups today", followupsToday, followupsToday > 0 ? "Due today" : "None due", CalendarClock],
-    ["Overdue follow-ups", overdueFollowups, overdueFollowups > 0 ? "Action needed" : "Up to date", Clock],
+    ["Total leads", totalLeads, totalLeads > 0 ? `${totalLeads} active` : "No leads", Users, () => navigate?.(leadsTarget)],
+    ["Added today", leadsAddedToday, leadsAddedToday > 0 ? `${leadsAddedToday} added` : "None added", UserPlus, () => navigate?.(leadsTarget)],
+    ["Follow-ups today", followupsToday, followupsToday > 0 ? "Due today" : "None due", CalendarClock, () => navigate?.("follow-ups")],
+    ["Overdue follow-ups", overdueFollowups, overdueFollowups > 0 ? "Action needed" : "Up to date", Clock, () => navigate?.("follow-ups")],
     ["Calls logged", callsToday, `${calls.length} total`, Phone],
-    ["Converted leads", convertedLeads, totalLeads > 0 ? `${Math.round((convertedLeads / totalLeads) * 100)}% conv.` : "0%", CheckCircle2],
+    ["Converted leads", convertedLeads, totalLeads > 0 ? `${Math.round((convertedLeads / totalLeads) * 100)}% conv.` : "0%", CheckCircle2, () => navigate?.("pipeline")],
   ];
 
   if (role === "HR") {
@@ -244,11 +246,11 @@ export default function Dashboard({
       <>
         <div className="stats-grid four">
           {[
-            ["Staff members", staff.length],
-            ["Active employees", staff.filter((person) => person.status === "Active").length],
+            ["Staff members", staff.length, () => navigate?.("staff")],
+            ["Active employees", staff.filter((person) => person.status === "Active").length, () => navigate?.("staff")],
             ["Open tasks", 0],
-            ["Salespeople", people.length],
-          ].map(([label, value]) => (
+            ["Salespeople", people.length, () => navigate?.("staff")],
+          ].map(([label, value, onClick]) => (
             <StatCard
               key={label}
               label={label}
@@ -256,6 +258,7 @@ export default function Dashboard({
               icon={Users}
               change="Active staff"
               showComparison={false}
+              onClick={onClick}
             />
           ))}
         </div>
@@ -317,7 +320,7 @@ export default function Dashboard({
   return (
     <>
       <div className="stats-grid dashboard-stats">
-        {stats.map(([label, value, change, icon], i) => (
+        {stats.map(([label, value, change, icon, onClick], i) => (
           <StatCard
             key={label}
             label={label}
@@ -325,6 +328,8 @@ export default function Dashboard({
             change={change}
             icon={icon}
             negative={i === 3 && value > 0}
+            showComparison={false}
+            onClick={onClick}
           />
         ))}
       </div>

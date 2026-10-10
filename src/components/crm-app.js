@@ -1705,9 +1705,15 @@ export default function CRMApp() {
             {!detailId && (
               <PageHeader
                 title={
-                  page === "dashboard"
-                    ? `${getGreeting()}, ${userName.split(" ")[0]}`
-                    : titles[page] || "Reports"
+                  page === "dashboard" ? (
+                    <span className="dashboard-greeting">
+                      <span className="greeting-prefix">{getGreeting()},</span>{" "}
+                      <br className="greeting-br" />
+                      <span className="greeting-name">{userName.split(" ")[0]}</span>
+                    </span>
+                  ) : (
+                    titles[page] || "Reports"
+                  )
                 }
                 description={
                   page === "dashboard"
