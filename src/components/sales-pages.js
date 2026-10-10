@@ -461,6 +461,7 @@ export function FollowupsPage({
       </div>
       <DataTable
         rows={rows.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
+        onRow={(r) => navigate("leads/" + r.leadId)}
         rowClassName={() => "followup-assignee-row"}
         rowStyle={(followup) => {
           const [background, hover, accent] = assigneeColors.get(followup.assigned) || ["#f8fafc", "#eef2f6", "#aab8c6"];
@@ -491,13 +492,11 @@ export function FollowupsPage({
             label: "Actions",
             render: (r) => (
               <div className="row-actions">
-                <button onClick={() => navigate("leads/" + r.leadId)}>
-                  View
-                </button>
                 {!readOnly && canWorkRecord(r) && <button
                   aria-label="Call customer"
                   title="Call & log"
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation();
                     openModal({ type: "call", record: r });
                   }}
                 >
@@ -507,7 +506,8 @@ export function FollowupsPage({
                   <>
                     <button
                       disabled={pendingId === r.id}
-                      onClick={async () => {
+                      onClick={async (event) => {
+                        event.stopPropagation();
                         setPendingId(r.id);
                         try { await onComplete(r); }
                         finally { setPendingId(null); }
@@ -516,14 +516,20 @@ export function FollowupsPage({
                       {r.completed ? "Reopen" : "Complete"}
                     </button>
                     {!r.completed && (
-                      <button onClick={() => openModal({ type: "followup", record: r })}>
+                      <button onClick={(event) => {
+                        event.stopPropagation();
+                        openModal({ type: "followup", record: r });
+                      }}>
                         Reschedule
                       </button>
                     )}
                   </>
                 )}
                 {!readOnly && canWorkRecord(r) && (
-                  <button className="danger-button" onClick={() => onDelete(r)}>Delete</button>
+                  <button className="danger-button" onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete(r);
+                  }}>Delete</button>
                 )}
               </div>
             ),
