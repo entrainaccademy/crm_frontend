@@ -119,8 +119,13 @@ export const api = {
   },
 
   // Calls
-  async getCalls() {
-    const res = await request("/calls");
+  async getCalls(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await request(`/calls${query ? `?${query}` : ""}`);
+    return res.success ? res.data : null;
+  },
+  async getCall(id) {
+    const res = await request(`/calls/${id}`);
     return res.success ? res.data : null;
   },
   async createCall(data) {
@@ -129,6 +134,38 @@ export const api = {
       body: JSON.stringify(data),
     });
     return res.success ? res.data : null;
+  },
+  async updateCall(id, data) {
+    const res = await request(`/calls/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+    return res.success ? res.data : null;
+  },
+  async deleteCall(id) {
+    const res = await request(`/calls/${id}`, { method: "DELETE" });
+    return res.success;
+  },
+
+  // Telephony & Call Recording
+  async getTelephonyStatus() {
+    const res = await request("/telephony/status");
+    return res.success ? res.data : { isConfigured: false, missing: ["SERVER_ERROR"] };
+  },
+  async initiateTelephonyCall(data) {
+    const res = await request("/telephony/initiate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    return res;
+  },
+  async getTelephonyCallStatus(callId) {
+    const res = await request(`/telephony/call/${callId}/status`);
+    return res.success ? res.data : null;
+  },
+  getCallAudioStreamUrl(callId) {
+    const token = typeof window !== "undefined" ? sessionStorage.getItem("entrain-token") : "";
+    return `${API_BASE}/calls/${callId}/audio${token ? `?token=${encodeURIComponent(token)}` : ""}`;
   },
 
   // Users

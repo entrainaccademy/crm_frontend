@@ -29,7 +29,8 @@ import {
   StatCard,
   EmptyState,
 } from "./ui";
-import { statuses, sources, priorities, closedStatuses, calls, money } from "@/lib/data";
+import { statuses, sources, priorities, closedStatuses, calls, money, getNoteText } from "@/lib/data";
+import { AudioPlayer } from "./AudioPlayer";
 const followupAssigneePalette = [
   ["#f8f5ff", "#f0eafd", "#9a82cc"],
   ["#f3f8ff", "#e9f2ff", "#6b9ed0"],
@@ -69,7 +70,6 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
   );
   const callLead = (event, lead) => {
     event.stopPropagation();
-    if (lead.phone) window.location.href = `tel:${lead.phone}`;
     openModal({ type: "call", record: lead });
   };
   return (
@@ -213,10 +213,6 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
             label: "Actions",
             render: (r) => (
               <div className="row-actions">
-                <button className="lead-action-icon" aria-label={`View ${r.name}`} title="View lead details" onClick={(event) => {
-                  event.stopPropagation();
-                  navigate("leads/" + r.id);
-                }}><ArrowUpRight size={16} aria-hidden="true" /></button>
                 {!readOnly && <button className="lead-action-icon" aria-label={`Call ${r.name}`} title="Call & log" onClick={(event) => callLead(event, r)}><Phone size={16} aria-hidden="true" /></button>}
                 {canEditLead(r) && <button className="lead-action-icon" aria-label={`Edit ${r.name}`} title="Edit lead" onClick={(event) => {
                   event.stopPropagation();
@@ -306,9 +302,6 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
         {!readOnly && <div className="toolbar-right">
           <button
             onClick={() => {
-              if (lead.phone) {
-                window.location.href = `tel:${lead.phone}`;
-              }
               openModal({ type: "call", record: lead });
             }}
           >
@@ -503,9 +496,6 @@ export function FollowupsPage({
                   aria-label="Call customer"
                   title="Call & log"
                   onClick={() => {
-                    if (r.phone) {
-                      window.location.href = `tel:${r.phone}`;
-                    }
                     openModal({ type: "call", record: r });
                   }}
                 >
@@ -783,7 +773,7 @@ export function CallsPage({
   const rows = (calls || []).filter(
     (c) =>
       (!allowedNames || allowedNames.includes(c.assigned)) &&
-      ((c.name || "") + (c.phone || "") + (c.assigned || "") + (c.notes || ""))
+      ((c.name || "") + (c.phone || "") + (c.assigned || "") + (getNoteText(c.notes) || ""))
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
@@ -791,6 +781,7 @@ export function CallsPage({
   const answered = rows.filter((c) => c.callStatus === "Answered").length;
   const missed = rows.filter((c) => c.callStatus === "Missed").length;
   const outgoing = rows.filter((c) => c.direction === "Outgoing").length;
+  const recorded = rows.filter((c) => c.recordingStatus === "Available" || c.recordingUrl || c.recordingSid).length;
 
   return (
     <>
@@ -800,8 +791,8 @@ export function CallsPage({
           ["Answered calls", answered],
           ["Missed calls", missed],
           ["Outgoing calls", outgoing],
-          ["Total duration", rows.length > 0 ? `${rows.length * 4}m` : "0m"],
-          ["Average duration", rows.length > 0 ? "04:15" : "00:00"],
+          ["Recorded calls", recorded],
+          ["Average duration", rows.length > 0 ? "03:45" : "00:00"],
         ].map(([label, value]) => (
           <StatCard key={label} label={label} value={value} icon={Phone} />
         ))}
@@ -867,7 +858,7 @@ export function CallsPage({
                 <a
                   href={`tel:${r.phone}`}
                   style={{ color: "inherit", textDecoration: "none" }}
-                  title="Click to dial"
+                  title="Click to dial directly"
                 >
                   {r.phone}
                 </a>
@@ -883,13 +874,38 @@ export function CallsPage({
               render: (r) => <StatusBadge status={r.callStatus} />,
             },
             {
+              key: "recording",
+              label: "Recording",
+              render: (r) => (
+                <AudioPlayer
+                  callId={r._id || r.id}
+                  duration={r.duration}
+                  recordingStatus={r.recordingStatus || (r.recordingUrl || r.recordingSid ? "Available" : "Not recorded")}
+                />
+              ),
+            },
+            {
               key: "notes",
               label: "Notes",
-              render: (r) => r.notes ? (
-                <span title={r.notes} style={{ maxWidth: "150px", display: "inline-block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {r.notes}
-                </span>
-              ) : <span className="muted">—</span>,
+              render: (r) => {
+                const noteText = getNoteText(r.notes);
+                return noteText ? (
+                  <span
+                    title={noteText}
+                    style={{
+                      maxWidth: "160px",
+                      display: "inline-block",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {noteText}
+                  </span>
+                ) : (
+                  <span className="muted">—</span>
+                );
+              },
             },
             !readOnly && {
               key: "action",
@@ -902,9 +918,8 @@ export function CallsPage({
                   <div className="row-actions" style={{ display: "flex", gap: "6px" }}>
                     <button
                       aria-label={"Call " + (r.name || "customer")}
-                      title="Call & log notes"
+                      title="Call customer"
                       onClick={() => {
-                        if (r.phone) window.location.href = `tel:${r.phone}`;
                         if (openModal) openModal({ type: "call", record: r });
                       }}
                     >

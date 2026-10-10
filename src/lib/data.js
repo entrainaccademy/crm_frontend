@@ -66,6 +66,39 @@ export const normalizeLead = (lead) => {
   };
 };
 
+export const getNoteText = (notes) => {
+  if (!notes) return "";
+  if (typeof notes === "string") {
+    if (notes === "[object Object]" || notes.startsWith("[object Object]")) {
+      return "";
+    }
+    return notes.trim();
+  }
+  if (Array.isArray(notes)) {
+    return notes
+      .map((n) => (typeof n === "string" ? n : n?.text || ""))
+      .filter((t) => t && t !== "[object Object]")
+      .join("\n")
+      .trim();
+  }
+  if (typeof notes === "object") {
+    return (notes.text || notes.note || "").trim();
+  }
+  return String(notes).trim();
+};
+
+export const normalizeCall = (call) => {
+  if (!call) return null;
+  return {
+    ...call,
+    id: call._id || call.id,
+    notes: getNoteText(call.notes),
+    recordingStatus: call.recordingStatus || (call.recordingUrl || call.recordingSid ? "Available" : "Not recorded"),
+    callType: call.callType || "manual",
+    duration: call.duration || "00:00",
+  };
+};
+
 export const normalizeFollowup = (followup) => ({
   ...followup,
   id: followup._id || followup.id,

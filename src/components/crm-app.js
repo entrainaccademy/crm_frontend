@@ -29,6 +29,11 @@ import {
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
+  PhoneCall,
+  AlertTriangle,
+  Radio,
+  Mic,
+  Loader2,
 } from "lucide-react";
 import Dashboard from "./dashboard";
 import CourseCombobox from "./course-combobox";
@@ -72,6 +77,8 @@ import {
   money,
   normalizeLead,
   normalizeFollowup,
+  normalizeCall,
+  getNoteText,
 } from "@/lib/data";
 import { downloadExport } from "@/lib/export";
 import { api } from "@/lib/api";
@@ -148,7 +155,29 @@ function getGreeting() {
   return "Good evening";
 }
 
-function CallModalFields({ modal, scopedLeads, people, assignmentNames, role, userName, courses, todayStr }) {
+function formatSecs(seconds) {
+  const secNum = parseInt(seconds, 10);
+  if (isNaN(secNum) || secNum <= 0) return "00:00";
+  const mins = Math.floor(secNum / 60);
+  const secs = secNum % 60;
+  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+function CallModalFields({
+  modal,
+  scopedLeads,
+  people,
+  assignmentNames,
+  role,
+  userName,
+  authUser,
+  courses,
+  todayStr,
+  notify,
+  setCallsState,
+  setLeads,
+  onClose,
+}) {
   const [selectedLeadId, setSelectedLeadId] = useState(
     modal.record?.leadId || modal.record?.customId || modal.record?.id || ""
   );
@@ -159,6 +188,96 @@ function CallModalFields({ modal, scopedLeads, people, assignmentNames, role, us
   const [customerName, setCustomerName] = useState(modal.record?.name || selectedLead?.name || "");
   const [phone, setPhone] = useState(modal.record?.phone || selectedLead?.phone || "");
   const [service, setService] = useState(modal.record?.service || selectedLead?.service || courses[0]?.name || "");
+  const [agentPhone, setAgentPhone] = useState(authUser?.phone || "+91 98470 12001");
+  const [notes, setNotes] = useState(
+    typeof modal.record?.notes === "string" && modal.record?.notes !== "[object Object]"
+      ? modal.record.notes
+      : ""
+  );
+  const [callMode, setCallMode] = useState("record"); // "record" | "manual"
+  const [telephonyConfig, setTelephonyConfig] = useState(null);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+
+  // Active call live tracking state
+  const [activeCall, setActiveCall] = useState(null);
+  const [isCalling, setIsCalling] = useState(false);
+  const [callElapsed, setCallElapsed] = useState(0);
+
+  // Fetch Telephony Provider Config Status
+  useEffect(() => {
+    let cancelled = false;
+    async function checkStatus() {
+      try {
+        const config = await api.getTelephonyStatus();
+        if (!cancelled) {
+          setTelephonyConfig(config);
+          setLoadingConfig(false);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setTelephonyConfig({ isConfigured: false, missing: ["CONFIG_ERROR"] });
+          setLoadingConfig(false);
+        }
+      }
+    }
+    checkStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Timer for active call duration
+  useEffect(() => {
+    let timer = null;
+    if (activeCall && ["Initiated", "Ringing", "In Progress"].includes(activeCall.callStatus)) {
+      timer = setInterval(() => {
+        setCallElapsed((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [activeCall?.callStatus]);
+
+  // Poll call status while active
+  useEffect(() => {
+    let pollInterval = null;
+    if (
+      activeCall?.callId &&
+      !["Completed", "Answered", "Missed", "Busy", "Disconnected", "Failed"].includes(
+        activeCall.callStatus
+      )
+    ) {
+      pollInterval = setInterval(async () => {
+        try {
+          const updated = await api.getTelephonyCallStatus(activeCall.callId);
+          if (updated) {
+            setActiveCall((prev) => ({
+              ...prev,
+              callStatus: updated.callStatus,
+              duration: updated.duration,
+              recordingStatus: updated.recordingStatus,
+            }));
+            if (
+              ["Completed", "Answered", "Missed", "Busy", "Disconnected", "Failed"].includes(
+                updated.callStatus
+              )
+            ) {
+              setCallsState((prev) => [
+                normalizeCall(updated),
+                ...prev.filter((c) => c._id !== updated._id && c.id !== updated._id),
+              ]);
+            }
+          }
+        } catch (err) {
+          console.warn("Poll call status error:", err);
+        }
+      }, 2500);
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [activeCall?.callId, activeCall?.callStatus, setCallsState]);
 
   const handleLeadChange = (e) => {
     const val = e.target.value;
@@ -167,7 +286,9 @@ function CallModalFields({ modal, scopedLeads, people, assignmentNames, role, us
       setCustomerName("");
       setPhone("");
     } else {
-      const match = scopedLeads.find((l) => String(l.id) === String(val) || String(l.customId) === String(val));
+      const match = scopedLeads.find(
+        (l) => String(l.id) === String(val) || String(l.customId) === String(val)
+      );
       if (match) {
         setCustomerName(match.name);
         setPhone(match.phone || match.whatsapp || "");
@@ -176,151 +297,427 @@ function CallModalFields({ modal, scopedLeads, people, assignmentNames, role, us
     }
   };
 
+  const handleStartRecordedCall = async () => {
+    if (!phone) {
+      notify("Please enter a valid customer phone number.", "error");
+      return;
+    }
+    if (!agentPhone) {
+      notify("Please enter your registered mobile number to receive the call.", "error");
+      return;
+    }
+
+    setIsCalling(true);
+    try {
+      const res = await api.initiateTelephonyCall({
+        leadId: selectedLead?.customId || selectedLead?.id || modal.record?.customId || modal.record?.id,
+        customerPhone: phone,
+        customerName: customerName || "Customer",
+        service,
+        agentPhone,
+        notes,
+      });
+
+      if (!res.success) {
+        notify(res.message || "Failed to initiate call", "error");
+        setIsCalling(false);
+        return;
+      }
+
+      notify("Call initiated! Your phone will ring in a few seconds.");
+      setActiveCall({
+        callId: res.callId || res.data?._id,
+        callStatus: "Initiated",
+        providerCallId: res.providerCallId,
+      });
+      setCallElapsed(0);
+      if (res.call) {
+        setCallsState((prev) => [normalizeCall(res.call), ...prev]);
+      }
+    } catch (err) {
+      notify(err.message || "Could not connect to telephony provider", "error");
+    } finally {
+      setIsCalling(false);
+    }
+  };
+
+  const handleFinishActiveCall = async () => {
+    if (activeCall?.callId && notes) {
+      try {
+        await api.updateCall(activeCall.callId, { notes });
+        setCallsState((prev) =>
+          prev.map((c) =>
+            c.id === activeCall.callId || c._id === activeCall.callId ? { ...c, notes } : c
+          )
+        );
+      } catch (err) {
+        console.warn("Could not save call notes:", err);
+      }
+    }
+    notify("Call saved to CRM records");
+    onClose?.();
+  };
+
   const isExistingLead = Boolean(selectedLead || scopedLeads.some((l) => l.phone && phone && l.phone === phone));
   const nowTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
 
   return (
-    <>
-      <label>
-        Link to existing lead
-        <select value={selectedLead ? (selectedLead.id || selectedLead.customId) : (selectedLeadId ? selectedLeadId : "custom")} onChange={handleLeadChange}>
-          <option value="custom">-- Unknown / Unsaved Number --</option>
-          {scopedLeads.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name} ({l.phone || "No phone"})
-            </option>
-          ))}
-        </select>
-      </label>
+    <div className="call-modal-container">
+      {/* Mode Switcher Tabs */}
+      <div className="call-modal-tabs">
+        <button
+          type="button"
+          className={`call-modal-tab ${callMode === "record" ? "active" : ""}`}
+          onClick={() => setCallMode("record")}
+        >
+          <PhoneCall size={14} />
+          <span>Call with Recording</span>
+          <span className="call-tab-badge">Automated</span>
+        </button>
+        <button
+          type="button"
+          className={`call-modal-tab ${callMode === "manual" ? "active" : ""}`}
+          onClick={() => setCallMode("manual")}
+        >
+          <Phone size={14} />
+          <span>Dial without recording</span>
+          <span className="call-tab-badge manual">tel: Fallback</span>
+        </button>
+      </div>
 
-      <label>
-        Customer name
-        <input
-          name="name"
-          type="text"
-          required
-          value={customerName}
-          onChange={(e) => setCustomerName(e.target.value)}
-          placeholder="e.g. John Doe or Unknown Caller"
-        />
-      </label>
+      {callMode === "record" ? (
+        <div className="call-record-mode-content">
+          {/* If Provider Not Configured: Show Setup Required Banner */}
+          {!loadingConfig && !telephonyConfig?.isConfigured && (
+            <div className="call-setup-required-alert">
+              <div className="setup-alert-header">
+                <AlertTriangle size={17} className="alert-icon" />
+                <strong>Call recording setup required</strong>
+              </div>
+              <p>
+                Telephony provider credentials are not configured in backend environment variables.
+                To enable automatic dual-side recording, configure <code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code>, and <code>TWILIO_PHONE_NUMBER</code> in your server <code>.env</code> file.
+              </p>
+              <div className="setup-alert-actions">
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => setCallMode("manual")}
+                >
+                  <Phone size={13} /> Switch to Dial without recording (tel:)
+                </button>
+              </div>
+            </div>
+          )}
 
-      <label>
-        Phone number
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <input
-            name="phone"
-            type="tel"
-            required
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+91 98765 43210"
-            style={{ flex: 1 }}
-          />
-          {phone && (
-            <a
-              href={`tel:${phone}`}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-                padding: "8px 12px",
-                background: "var(--card-bg, #f1f5f9)",
-                borderRadius: "6px",
-                textDecoration: "none",
-                fontSize: "13px",
-                color: "var(--text, #0f172a)",
-                fontWeight: 500,
-                border: "1px solid var(--border, #cbd5e1)"
-              }}
-              title="Click to dial this number directly"
-            >
-              <Phone size={14} /> Dial
-            </a>
+          {/* If Active Call is ongoing */}
+          {activeCall ? (
+            <div className="active-call-panel">
+              <div className="active-call-header">
+                <div className="pulse-ring">
+                  <span className="pulse-dot" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontSize: "14px", fontWeight: 600, margin: 0 }}>
+                    {activeCall.callStatus === "Initiated"
+                      ? "Ringing your phone..."
+                      : activeCall.callStatus === "Ringing"
+                      ? "Calling customer..."
+                      : activeCall.callStatus === "In Progress"
+                      ? "In Call · Recording Active"
+                      : `Call ${activeCall.callStatus}`}
+                  </h3>
+                  <small className="muted" style={{ fontSize: "12px" }}>
+                    {customerName || "Customer"} ({phone})
+                  </small>
+                </div>
+                <div className="active-call-timer">
+                  {formatSecs(callElapsed)}
+                </div>
+              </div>
+
+              <div className="active-call-body">
+                <div className="active-call-notice">
+                  <Mic size={14} style={{ color: "#059669", flexShrink: 0 }} />
+                  <span>Dual-channel recording and legal consent announcement active.</span>
+                </div>
+
+                <label style={{ marginTop: "12px" }}>
+                  Call Discussion Notes
+                  <textarea
+                    rows={3}
+                    placeholder="Take notes while speaking or summarize key outcomes..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="active-call-footer" style={{ marginTop: "14px" }}>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={handleFinishActiveCall}
+                  style={{ width: "100%", justifyContent: "center" }}
+                >
+                  <Check size={14} /> Done / Save Call Notes
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Call Initiation Form */
+            <div className="call-initiation-form">
+              <label>
+                Link to existing lead
+                <select
+                  value={selectedLead ? (selectedLead.id || selectedLead.customId) : (selectedLeadId ? selectedLeadId : "custom")}
+                  onChange={handleLeadChange}
+                >
+                  <option value="custom">-- Unknown / Unsaved Number --</option>
+                  {scopedLeads.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.phone || "No phone"})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <label>
+                  Customer name
+                  <input
+                    name="name"
+                    type="text"
+                    required
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="e.g. John Doe"
+                  />
+                </label>
+                <label>
+                  Customer phone
+                  <input
+                    name="phone"
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+91 98765 43210"
+                  />
+                </label>
+              </div>
+
+              <label>
+                Your registered mobile number (Executive leg)
+                <input
+                  type="tel"
+                  required
+                  value={agentPhone}
+                  onChange={(e) => setAgentPhone(e.target.value)}
+                  placeholder="+91 98470 12000"
+                />
+                <small className="muted" style={{ fontSize: "11px", display: "block", marginTop: "2px" }}>
+                  The provider calls your phone first. Once you answer, it connects to the customer.
+                </small>
+              </label>
+
+              <label>
+                Course / Service
+                <select name="service" value={service} onChange={(e) => setService(e.target.value)}>
+                  <option value="">General Inquiry</option>
+                  {courses.map((c) => (
+                    <option key={c.name} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Call notes / discussion plan (optional)
+                <textarea
+                  rows={2}
+                  placeholder="Key topics to cover in this call..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </label>
+
+              {telephonyConfig?.isConfigured && (
+                <div style={{ marginTop: "14px" }}>
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={isCalling || !phone || !agentPhone}
+                    onClick={handleStartRecordedCall}
+                    style={{ width: "100%", padding: "10px", justifyContent: "center", fontSize: "13px" }}
+                  >
+                    {isCalling ? (
+                      <>
+                        <Loader2 size={15} className="spin-icon" /> Connecting Provider...
+                      </>
+                    ) : (
+                      <>
+                        <PhoneCall size={15} /> Start Recorded Call Now
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
-      </label>
+      ) : (
+        /* Manual Dial Mode (tel: fallback) */
+        <div className="call-manual-mode-content">
+          <div className="manual-dial-banner">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+              <div>
+                <strong>Manual SIM Call (`tel:`)</strong>
+                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "var(--muted)" }}>
+                  Opens your device dialer. Outcome and duration must be entered manually.
+                </p>
+              </div>
+              {phone && (
+                <a
+                  href={`tel:${phone}`}
+                  className="open-dialer-btn"
+                  title="Click to dial on phone"
+                >
+                  <Phone size={13} /> Open Dialer
+                </a>
+              )}
+            </div>
+          </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-        <label>
-          Call direction
-          <select name="direction" defaultValue={modal.record?.direction || "Outgoing"}>
-            <option value="Outgoing">Outgoing (We called)</option>
-            <option value="Incoming">Incoming (They called)</option>
-          </select>
-        </label>
-
-        <label>
-          Call status / outcome
-          <select name="callStatus" defaultValue={modal.record?.callStatus || "Answered"}>
-            <option value="Answered">Answered</option>
-            <option value="Missed">Missed</option>
-            <option value="Busy">Busy</option>
-            <option value="Voicemail">Voicemail</option>
-            <option value="Disconnected">Disconnected</option>
-          </select>
-        </label>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-        <label>
-          Duration
-          <input name="duration" type="text" defaultValue={modal.record?.duration || "01:30"} placeholder="mm:ss (e.g. 02:45)" />
-        </label>
-
-        <label>
-          Course / Service
-          <select name="service" value={service} onChange={(e) => setService(e.target.value)}>
-            <option value="">General Inquiry</option>
-            {service && !courses.some((course) => course.name === service) && <option value={service}>{service} (archived)</option>}
-            {courses.map((c) => (
-              <option key={c.name} value={c.name}>{c.name}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {!["Team Lead", "Sales Executive"].includes(role) && (
-        <label>
-          Assigned executive
-          <select name="assigned" defaultValue={modal.record?.assigned || userName}>
-            {people
-              .filter((p) => !assignmentNames || assignmentNames.includes(p.name))
-              .map((p) => (
-                <option key={p.id} value={p.name}>{p.name}</option>
+          <label>
+            Link to existing lead
+            <select
+              value={selectedLead ? (selectedLead.id || selectedLead.customId) : (selectedLeadId ? selectedLeadId : "custom")}
+              onChange={handleLeadChange}
+            >
+              <option value="custom">-- Unknown / Unsaved Number --</option>
+              {scopedLeads.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name} ({l.phone || "No phone"})
+                </option>
               ))}
-          </select>
-        </label>
+            </select>
+          </label>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <label>
+              Customer name
+              <input
+                name="name"
+                type="text"
+                required
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="e.g. John Doe"
+              />
+            </label>
+            <label>
+              Customer phone
+              <input
+                name="phone"
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+              />
+            </label>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <label>
+              Call direction
+              <select name="direction" defaultValue={modal.record?.direction || "Outgoing"}>
+                <option value="Outgoing">Outgoing (We called)</option>
+                <option value="Incoming">Incoming (They called)</option>
+              </select>
+            </label>
+
+            <label>
+              Call status / outcome
+              <select name="callStatus" defaultValue={modal.record?.callStatus || "Answered"}>
+                <option value="Answered">Answered</option>
+                <option value="Missed">Missed</option>
+                <option value="Busy">Busy</option>
+                <option value="Voicemail">Voicemail</option>
+                <option value="Disconnected">Disconnected</option>
+              </select>
+            </label>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <label>
+              Actual Duration
+              <input
+                name="duration"
+                type="text"
+                defaultValue={modal.record?.duration || "01:30"}
+                placeholder="mm:ss (e.g. 02:45)"
+              />
+            </label>
+
+            <label>
+              Course / Service
+              <select name="service" value={service} onChange={(e) => setService(e.target.value)}>
+                <option value="">General Inquiry</option>
+                {courses.map((c) => (
+                  <option key={c.name} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {!["Team Lead", "Sales Executive"].includes(role) && (
+            <label>
+              Assigned executive
+              <select name="assigned" defaultValue={modal.record?.assigned || userName}>
+                {people
+                  .filter((p) => !assignmentNames || assignmentNames.includes(p.name))
+                  .map((p) => (
+                    <option key={p.id} value={p.name}>{p.name}</option>
+                  ))}
+              </select>
+            </label>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <label>
+              Call date
+              <input name="callDate" type="date" defaultValue={todayStr} />
+            </label>
+            <label>
+              Call time
+              <input name="callTime" type="time" defaultValue={nowTime} />
+            </label>
+          </div>
+
+          <label>
+            Call notes & discussion summary
+            <textarea
+              name="notes"
+              rows={3}
+              placeholder="What was discussed during this call?"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </label>
+
+          {!isExistingLead && (
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", cursor: "pointer", fontSize: "13px", fontWeight: 500 }}>
+              <input type="checkbox" name="createAsLead" defaultChecked={true} style={{ width: "auto", margin: 0 }} />
+              <span>Save this unknown number as a new lead in CRM</span>
+            </label>
+          )}
+
+          <input type="hidden" name="recordingStatus" value="Not recorded" />
+          <input type="hidden" name="callType" value="manual" />
+        </div>
       )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-        <label>
-          Call date
-          <input name="callDate" type="date" defaultValue={todayStr} />
-        </label>
-        <label>
-          Call time
-          <input name="callTime" type="time" defaultValue={nowTime} />
-        </label>
-      </div>
-
-      <label>
-        Call notes & discussion summary
-        <textarea
-          name="notes"
-          rows={3}
-          placeholder="What was discussed during this call?"
-          defaultValue={modal.record?.notes || ""}
-        />
-      </label>
-
-      {!isExistingLead && (
-        <label style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", cursor: "pointer", fontSize: "13px", fontWeight: 500, color: "var(--text, #1e293b)" }}>
-          <input type="checkbox" name="createAsLead" defaultChecked={true} style={{ width: "auto", margin: 0 }} />
-          <span>Save this unknown number as a new lead in CRM</span>
-        </label>
-      )}
-    </>
+    </div>
   );
 }
 
@@ -771,6 +1168,7 @@ export default function CRMApp() {
     const data = Object.fromEntries(new FormData(e.currentTarget));
     const todayStr = new Date().toISOString().split("T")[0];
     if (modal.type === "call") {
+      const sanitizedNotes = getNoteText(data.notes);
       const callData = {
         name: data.name?.trim() || "Unknown",
         phone: data.phone?.trim() || "",
@@ -781,7 +1179,9 @@ export default function CRMApp() {
         assigned: ["Team Lead", "Sales Executive"].includes(role) ? userName : (data.assigned || userName),
         callDate: data.callDate || new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
         callTime: data.callTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-        notes: data.notes?.trim() || "",
+        notes: sanitizedNotes,
+        recordingStatus: data.recordingStatus || "Not recorded",
+        callType: data.callType || "manual",
         leadId: modal.record?.customId || modal.record?.id || (data.leadId && data.leadId !== "custom" ? Number(data.leadId) : undefined),
       };
 
@@ -790,7 +1190,7 @@ export default function CRMApp() {
         notify("Could not log call. Please try again.", "error");
         return;
       }
-      setCallsState((prev) => [saved, ...prev]);
+      setCallsState((prev) => [normalizeCall(saved), ...prev]);
 
       if (data.createAsLead === "on" || data.createAsLead === "true") {
         const selectedCourse = courses.find((course) => course.name === data.service);
@@ -1712,8 +2112,13 @@ export default function CRMApp() {
                     assignmentNames={assignmentNames}
                     role={role}
                     userName={userName}
+                    authUser={authUser}
                     courses={courses}
                     todayStr={todayStr}
+                    notify={notify}
+                    setCallsState={setCallsState}
+                    setLeads={setLeads}
+                    onClose={() => setModal(null)}
                   />
                 )}
                 {modal.type === "user" && (

@@ -4398,3 +4398,311 @@ textarea {
     font-size: 15px;
   }
 }
+
+/* ==========================================================================
+   CALL RECORDING & AUDIO PLAYER STYLES
+   ========================================================================== */
+
+/* Compact Table Audio Player */
+.compact-audio-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 4px 10px 4px 5px;
+  min-width: 170px;
+  max-width: 220px;
+  transition: all 0.2s ease;
+}
+.compact-audio-player:hover,
+.compact-audio-player.is-playing {
+  background: #f0fdf4;
+  border-color: #86efac;
+  box-shadow: 0 1px 4px rgba(22, 163, 74, 0.1);
+}
+
+.audio-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #087e6f;
+  color: white;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.audio-ctrl-btn:hover {
+  background: #065f54;
+  transform: scale(1.05);
+}
+.compact-audio-player.is-playing .audio-ctrl-btn {
+  background: #16a34a;
+}
+
+.audio-track-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.audio-seek-slider {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #cbd5e1;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+}
+.audio-seek-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #087e6f;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.audio-seek-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+}
+
+.audio-time-label {
+  display: flex;
+  gap: 3px;
+  font-size: 10px;
+  font-family: monospace;
+  color: #64748b;
+  line-height: 1;
+}
+
+.audio-player-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+/* Recording Status Badges */
+.recording-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+.recording-status-badge.processing {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+.recording-status-badge.failed {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Call Modal Tabs */
+.call-modal-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.call-modal-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+.call-modal-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.call-modal-tab.active {
+  background: white;
+  color: #0f172a;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.call-tab-badge {
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #ecfdf5;
+  color: #059669;
+}
+.call-tab-badge.manual {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* Call Setup Required Alert */
+.call-setup-required-alert {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.call-setup-required-alert .setup-alert-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #92400e;
+  font-size: 13px;
+}
+.call-setup-required-alert p {
+  color: #78350f;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+}
+.call-setup-required-alert code {
+  background: #fef3c7;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: monospace;
+}
+.setup-alert-actions {
+  margin-top: 4px;
+}
+
+/* Active Call Tracking Panel */
+.active-call-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.active-call-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pulse-ring {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pulse-dot {
+  width: 12px;
+  height: 12px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+.active-call-timer {
+  font-family: monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  background: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+}
+.active-call-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #065f46;
+  background: #ecfdf5;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #a7f3d0;
+}
+
+/* Manual Dial Banner */
+.manual-dial-banner {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.open-dialer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #087e6f;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+.open-dialer-btn:hover {
+  background: #065f54;
+}
+
