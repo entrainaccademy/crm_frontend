@@ -72,6 +72,10 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
   );
   const callLead = (event, lead) => {
     event.stopPropagation();
+    if (lead?.phone && typeof window !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
+      const cleanPhone = String(lead.phone).replace(/[^\d+]/g, "");
+      window.location.href = `tel:${cleanPhone}`;
+    }
     openModal({ type: "call", record: lead });
   };
   return (
@@ -181,14 +185,24 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
           {
             key: "phone",
             label: "Phone",
-            render: (r) =>
-              readOnly || !r.phone ? (
-                r.phone
-              ) : (
-                <button className="lead-phone-call" title="Call & log" aria-label={`Call ${r.name}`} onClick={(event) => callLead(event, r)}>
-                  <Phone size={14} aria-hidden="true" /> {r.phone}
-                </button>
-              ),
+            render: (r) => {
+              if (!r.phone) return "—";
+              const cleanPhone = String(r.phone).replace(/[^\d+]/g, "");
+              return (
+                <a
+                  className="lead-phone-call"
+                  href={`tel:${cleanPhone}`}
+                  title={`Call ${r.phone} in mobile dialer`}
+                  aria-label={`Call ${r.name || r.phone}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
+                  <Phone size={14} aria-hidden="true" />
+                  <span>{r.phone}</span>
+                </a>
+              );
+            },
           },
           { key: "source", label: "Source" },
           { key: "service", label: "Course" },
@@ -271,7 +285,28 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
         {fields.map(([key, value]) => (
           <div key={key}>
             <dt>{key}</dt>
-            <dd>{value}</dd>
+            <dd>
+              {key === "Phone" && value ? (
+                <a
+                  href={`tel:${String(value).replace(/[^\d+]/g, "")}`}
+                  className="lead-phone-call"
+                  title="Call in mobile dialer"
+                >
+                  <Phone size={13} aria-hidden="true" /> {value}
+                </a>
+              ) : key === "WhatsApp" && value ? (
+                <a
+                  href={`https://wa.me/${String(value).replace(/\D/g, "")}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "#16a34a", fontWeight: 500 }}
+                >
+                  {value}
+                </a>
+              ) : (
+                value
+              )}
+            </dd>
           </div>
         ))}
       </dl>
@@ -290,7 +325,17 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
         <div>
           <h1>{lead.name}</h1>
           <p>
-            {lead.phone} · Assigned to {lead.assigned}
+            {lead.phone ? (
+              <a
+                href={`tel:${String(lead.phone).replace(/[^\d+]/g, "")}`}
+                className="lead-phone-call"
+                style={{ padding: "2px 8px", fontSize: "13px", verticalAlign: "middle", marginRight: "6px" }}
+                title="Call in mobile dialer"
+              >
+                <Phone size={13} aria-hidden="true" /> {lead.phone}
+              </a>
+            ) : "No phone"}{" "}
+            · Assigned to {lead.assigned}
           </p>
         </div>
         <StatusBadge status={lead.status} />
@@ -304,6 +349,9 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
         {!readOnly && <div className="toolbar-right">
           <button
             onClick={() => {
+              if (lead?.phone && typeof window !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
+                window.location.href = `tel:${String(lead.phone).replace(/[^\d+]/g, "")}`;
+              }
               openModal({ type: "call", record: lead });
             }}
           >
@@ -477,7 +525,26 @@ export function FollowupsPage({
             label: "Customer",
             render: (r) => <strong>{r.name}</strong>,
           },
-          { key: "phone", label: "Phone" },
+          {
+            key: "phone",
+            label: "Phone",
+            render: (r) => {
+              if (!r.phone) return "—";
+              const cleanPhone = String(r.phone).replace(/[^\d+]/g, "");
+              return (
+                <a
+                  className="lead-phone-call"
+                  href={`tel:${cleanPhone}`}
+                  title={`Call ${r.phone} in mobile dialer`}
+                  aria-label={`Call ${r.name || r.phone}`}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Phone size={14} aria-hidden="true" />
+                  <span>{r.phone}</span>
+                </a>
+              );
+            },
+          },
           { key: "assigned", label: "Assigned to", render: (r) => <span className="followup-assignee"><i aria-hidden="true" />{r.assigned || "Unassigned"}</span> },
           { key: "date", label: "Follow-up date" },
           { key: "time", label: "Time" },
@@ -497,6 +564,9 @@ export function FollowupsPage({
                   title="Call & log"
                   onClick={(event) => {
                     event.stopPropagation();
+                    if (r?.phone && typeof window !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
+                      window.location.href = `tel:${String(r.phone).replace(/[^\d+]/g, "")}`;
+                    }
                     openModal({ type: "call", record: r });
                   }}
                 >
@@ -599,7 +669,18 @@ export function LeadCard({ lead, navigate, onMove, onDragComplete, readOnly = fa
       >
         {lead.name}
       </button>
-      <div className="kanban-phone">{lead.phone}</div>
+      {lead.phone ? (
+        <a
+          href={`tel:${String(lead.phone).replace(/[^\d+]/g, "")}`}
+          className="kanban-phone"
+          title={`Call ${lead.phone} in mobile dialer`}
+          onClick={(e) => e.stopPropagation()}
+          style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "5px" }}
+        >
+          <Phone size={12} aria-hidden="true" />
+          <span>{lead.phone}</span>
+        </a>
+      ) : null}
       <div className="kanban-course">{lead.service}</div>
       <div className="kanban-card-money">
         <span>Sale amount</span>
@@ -989,7 +1070,26 @@ export function CustomersPage({ leads = [], navigate }) {
               </div>
             ),
           },
-          { key: "phone", label: "Phone" },
+          {
+            key: "phone",
+            label: "Phone",
+            render: (r) => {
+              if (!r.phone) return "—";
+              const cleanPhone = String(r.phone).replace(/[^\d+]/g, "");
+              return (
+                <a
+                  className="lead-phone-call"
+                  href={`tel:${cleanPhone}`}
+                  title={`Call ${r.phone} in mobile dialer`}
+                  aria-label={`Call ${r.name || r.phone}`}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Phone size={14} aria-hidden="true" />
+                  <span>{r.phone}</span>
+                </a>
+              );
+            },
+          },
           { key: "email", label: "Email" },
           { key: "location", label: "Location", render: (r) => r.location || "—" },
           {

@@ -19,8 +19,8 @@ const poppins = Poppins({
 });
 
 export const metadata = {
-  title: "ENTRAIN CRM | Workspace",
-  description: "ENTRAIN CRM — your growth, in focus.",
+  title: "Trackio CRM | Workspace",
+  description: "Trackio LEADS CRM — your growth, in focus.",
 };
 
 export default function RootLayout({ children }) {

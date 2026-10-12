@@ -1438,7 +1438,7 @@ export default function CRMApp() {
           </aside>
           <section className="auth-panel" aria-label="Account access">
             <div className="auth-panel-inner">
-              <div className="auth-logo"><img src="/images/entrain-logo.png" alt="ENTRAIN Academy" /><span>CRM</span></div>
+              <div className="auth-logo"><img src="/images/trackio-logo.png" alt="Trackio LEADS" /><span>CRM</span></div>
               <form className="auth-form" onSubmit={async (e) => {
                 e.preventDefault();
                 setAuthError("");
@@ -1481,13 +1481,13 @@ export default function CRMApp() {
         <a
           className="brand mobile-brand"
           href="/"
-          aria-label="ENTRAIN Academy CRM"
+          aria-label="Trackio CRM"
           onClick={(e) => {
             e.preventDefault();
             navigate("dashboard");
           }}
         >
-          <img className="brand-full" src="/images/entrain-logo.png" alt="ENTRAIN Academy" />
+          <img className="brand-full" src="/images/trackio-logo.png" alt="Trackio LEADS" />
         </a>
         <div className="global-search">
           <Search size={16} />
@@ -1598,13 +1598,13 @@ export default function CRMApp() {
           <a
             className="brand sidebar-brand"
             href="/"
-            aria-label="ENTRAIN Academy CRM"
+            aria-label="Trackio CRM"
             onClick={(event) => {
               event.preventDefault();
               navigate("dashboard");
             }}
           >
-            <img className="brand-full" src="/images/entrain-logo.png" alt="ENTRAIN Academy" />
+            <img className="brand-full" src="/images/trackio-logo-white.png" alt="Trackio LEADS" />
           </a>
           <button
             className="sidebar-collapse"
