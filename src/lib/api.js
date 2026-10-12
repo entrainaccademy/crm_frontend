@@ -1,4 +1,7 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api")
+  .trim()
+  .replace(/\/+$/, "");
+const API_BASE = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
 
 async function request(endpoint, options = {}) {
   try {

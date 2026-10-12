@@ -1423,7 +1423,7 @@ export default function CRMApp() {
       <div className="auth-screen">
         <div className="auth-shell">
           <aside className="auth-story">
-            <div className="auth-story-brand"><span className="auth-story-mark">E</span><span>ENTRAIN <strong>CRM</strong></span></div>
+            <div className="auth-story-brand"><span className="auth-story-mark">T</span><span>Trackio <strong>CRM</strong></span></div>
             <div className="auth-story-copy">
               <span className="auth-eyebrow">YOUR SALES WORKSPACE</span>
               <h1>Make every conversation count.</h1>
@@ -1434,7 +1434,7 @@ export default function CRMApp() {
                 <span><ChartNoAxesCombined size={18} /> See your progress clearly</span>
               </div>
             </div>
-            <span className="auth-story-footer">ENTRAIN ACADEMY · SALES WORKSPACE</span>
+            <span className="auth-story-footer">TRACKIO LEADS · SALES WORKSPACE</span>
           </aside>
           <section className="auth-panel" aria-label="Account access">
             <div className="auth-panel-inner">
