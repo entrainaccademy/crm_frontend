@@ -1456,7 +1456,6 @@ export default function CRMApp() {
                 <div className="auth-form-intro">
                   <span className="auth-eyebrow">WELCOME BACK</span>
                   <h2>Sign in to your workspace</h2>
-                  <p>Enter the credentials provided by your administrator.</p>
                 </div>
                 <label>Email address<input name="email" type="email" autoComplete="email" placeholder="you@example.com" required /></label>
                 <label>Password<div className="auth-password"><input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter your password" required /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? "Hide" : "Show"}</button></div></label>
