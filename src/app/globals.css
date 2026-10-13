@@ -1219,6 +1219,7 @@ td small {
   background: #eef1f5;
   color: #66778b;
 }
+.badge-not-connected,
 .badge-follow-up,
 .badge-scheduled,
 .badge-quotation,
@@ -3430,6 +3431,7 @@ textarea {
   background: #e8f0fa;
   color: #436d9a;
 }
+.badge-not-connected,
 .badge-follow-up,
 .badge-scheduled,
 .badge-quotation,
@@ -3549,6 +3551,7 @@ textarea {
 .leads-table-card .badge-contacted {
   color: #295a8e;
 }
+.leads-table-card .badge-not-connected,
 .leads-table-card .badge-follow-up,
 .leads-table-card .badge-quotation {
   color: #81541b;

@@ -634,6 +634,7 @@ export function FollowupsPage({
 }
 const pipelineStageColors = {
   New: "#8798a1",
+  "Not Connected": "#ba855d",
   Contacted: "#7194a5",
   "Follow-up": "#aa8a55",
   Qualified: "#438a91",

@@ -26,6 +26,7 @@ export const rankExecutives = (people = []) =>
   });
 
 export const statuses = [
+  "Not Connected",
   "Contacted",
   "Follow-up",
   "Qualified",
