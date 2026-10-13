@@ -450,6 +450,16 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
         <section className="card detail-card">
           <h2>Activity timeline</h2>
           <ActivityTimeline items={lead.activities} />
+          {lead.statusAudit?.length > 0 && (
+            <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, paddingTop: 12 }}>
+              <strong>Status history</strong>
+              {[...lead.statusAudit].reverse().map((entry) => (
+                <p key={entry._id || entry.occurredAt} className="muted" style={{ margin: "8px 0" }}>
+                  {entry.fromStatus || "No status"} → {entry.toStatus} · {entry.actorName} · {entry.source === "provider" ? "Provider verified" : "Manual update"} · {new Date(entry.occurredAt).toLocaleString()}
+                </p>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </>
@@ -962,6 +972,22 @@ export function CallsPage({
               key: "callStatus",
               label: "Status",
               render: (r) => <StatusBadge status={r.callStatus} />,
+            },
+            {
+              key: "evidence",
+              label: "Evidence",
+              render: (r) => (
+                <span
+                  title={r.providerVerifiedAt
+                    ? "Outcome received through a signed provider callback"
+                    : r.callType === "telephony"
+                      ? "Awaiting provider confirmation"
+                      : "Outcome entered by a CRM user"}
+                  style={{ color: r.providerVerifiedAt ? "#157a55" : "#8a5a16", fontWeight: 600, whiteSpace: "nowrap" }}
+                >
+                  {r.providerVerifiedAt ? "Provider verified" : r.callType === "telephony" ? "Pending provider" : "Self-reported"}
+                </span>
+              ),
             },
             {
               key: "recording",

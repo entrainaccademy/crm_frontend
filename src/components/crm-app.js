@@ -574,7 +574,7 @@ function CallModalFields({
               <div>
                 <strong>Manual SIM Call (`tel:`)</strong>
                 <p style={{ margin: "2px 0 0", fontSize: "12px", color: "var(--muted)" }}>
-                  Opens your device dialer. Outcome and duration must be entered manually.
+                  Opens your device dialer. Outcome and duration are self-reported and cannot be provider verified.
                 </p>
               </div>
               {phone && (
@@ -656,7 +656,7 @@ function CallModalFields({
               <input
                 name="duration"
                 type="text"
-                defaultValue={modal.record?.duration || "01:30"}
+                defaultValue=""
                 placeholder="mm:ss (e.g. 02:45)"
               />
             </label>
