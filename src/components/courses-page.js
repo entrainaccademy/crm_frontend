@@ -5,6 +5,7 @@ import { Pencil, RotateCcw, Archive, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { money } from "@/lib/data";
 import { Modal, ConfirmDialog } from "./ui";
+import EmptyState from "./empty-state";
 import "./courses-page.css";
 
 export default function CoursesPage({ courses, loading, loadError, onRefresh, notify, editor, setEditor }) {
@@ -78,7 +79,7 @@ export default function CoursesPage({ courses, loading, loadError, onRefresh, no
         <div className="courses-intro">Manage the courses offered in new leads. Archiving hides a course from new leads; deleting removes it permanently. Existing leads keep their course name.</div>
         {loadError ? <div role="alert" className="courses-message">Could not load courses. <button type="button" onClick={onRefresh}>Retry</button></div>
           : loading ? <div className="courses-message">Loading courses…</div>
-          : courses.length === 0 ? <div className="courses-message">No courses yet. Add the first course to make it available for leads.</div>
+          : courses.length === 0 ? <EmptyState kind="courses" title="No courses yet" description="Add your first course so your team can select it when creating leads." action="Add course" onAction={() => setEditor("new")} />
           : <div className="courses-table-wrap"><table className="courses-table">
               <thead><tr><th>Course</th><th>Duration</th><th>Fee</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>{courses.map((course) => <tr key={course._id}>

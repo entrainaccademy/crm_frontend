@@ -29,6 +29,7 @@ import {
 import { rankExecutives, money, roles, access, sources, statuses, priorities, convertedStatuses, closedStatuses } from "@/lib/data";
 import { SalesChart } from "./dashboard";
 import { api } from "@/lib/api";
+import EmptyState from "./empty-state";
 export function LeaderboardPage({ accounts = [], canManage = false, onAddPerson, onUpdateAccount }) {
   const [period, setPeriod] = useState("This Month");
   const [startDate, setStartDate] = useState("");
@@ -260,110 +261,73 @@ export function LeaderboardPage({ accounts = [], canManage = false, onAddPerson,
     </>
   );
 }
-export function TargetsPage({ people, setPeople, notify }) {
-  const [who, setWho] = useState(people[0]?.name || ""),
-    [amount, setAmount] = useState(500000),
-    [period, setPeriod] = useState("Monthly"),
-    [history, setHistory] = useState(() =>
-      people.flatMap((person) =>
-        [
-          ["August 2026", 0.94],
-          ["July 2026", 0.88],
-          ["June 2026", 0.81],
-        ].map(([month, factor]) => ({
-          id: `${person.id}-${month}`,
-          executive: person.name,
-          period: month,
-          target: person.target,
-          sales: Math.round(person.sales * factor),
-        })),
-      ),
-    );
+export function TargetsPage({ people, onUpdateAccount, onAddSalesperson, canManage = false }) {
+  const [who, setWho] = useState("");
+  const [amount, setAmount] = useState(500000);
+  const [busy, setBusy] = useState(false);
+  const selected = people.find((person) => String(person.id) === who) || people[0];
+
+  useEffect(() => {
+    setAmount(selected?.target || 500000);
+  }, [selected?.id, selected?.target]);
+
   if (!people.length) {
-    return <div className="card empty-inline">No salespeople yet. Create a Team Lead or Sales Executive account before assigning targets.</div>;
+    return (
+      <section className="card">
+        <EmptyState
+          kind="targets"
+          title="No sales targets to assign yet"
+          description={canManage
+            ? "Add a Team Lead or Sales Executive first, then set their sales goal here."
+            : "An administrator can add a Team Lead or Sales Executive and assign their target."}
+          action="Add salesperson"
+          onAction={onAddSalesperson}
+        />
+      </section>
+    );
   }
+
   return (
-    <div className="two-columns">
-      <section className="card detail-card">
-        <h2>Assign a sales target</h2>
-        <p className="section-subtitle">
-          Set a monthly or quarterly goal for one salesperson.
-        </p>
-        <form
-          className="form-stack"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setPeople(
-              people.map((p) =>
-                p.name === who ? { ...p, target: Number(amount) } : p,
-              ),
-            );
-            setHistory([
-              {
-                id: Date.now(),
-                executive: who,
-                period: period + " · September 2026",
-                target: Number(amount),
-                sales: 0,
-              },
-              ...history,
-            ]);
-            notify("Target saved successfully");
-          }}
-        >
+    <div className={canManage ? "two-columns" : ""}>
+      {canManage && <section className="card detail-card">
+        <h2>Assign a monthly sales target</h2>
+        <p className="section-subtitle">Set the current goal for a salesperson.</p>
+        <form className="form-stack" onSubmit={async (event) => {
+          event.preventDefault();
+          const target = Number(amount);
+          if (!selected || !Number.isFinite(target) || target <= 0 || busy) return;
+          setBusy(true);
+          try {
+            await onUpdateAccount(selected, { target });
+          } finally {
+            setBusy(false);
+          }
+        }}>
           <label>
             Salesperson
-            <select value={who} onChange={(e) => setWho(e.target.value)}>
+            <select value={String(selected.id)} onChange={(event) => setWho(event.target.value)}>
               {people.map((person) => (
-                <option key={person.id} value={person.name}>
-                  {person.name}
-                </option>
+                <option key={person.id} value={String(person.id)}>{person.name}</option>
               ))}
             </select>
           </label>
           <label>
-            Period
-            <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-              <option>Monthly</option>
-              <option>Quarterly</option>
-            </select>
+            Monthly target (₹)
+            <input type="number" min="1" step="1" required value={amount} onChange={(event) => setAmount(event.target.value)} />
           </label>
-          <label>
-            Month
-            <input type="month" defaultValue={new Date().toISOString().slice(0, 7)} required />
-          </label>
-          <label>
-            Target amount (₹)
-            <input
-              type="number"
-              min="1"
-              required
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </label>
-          <button className="primary">
-            <Save size={15} /> Save target
+          <button className="primary" type="submit" disabled={busy}>
+            <Save size={15} /> {busy ? "Saving…" : "Save target"}
           </button>
         </form>
-      </section>
+      </section>}
       <section className="card detail-card">
-        <h2>Target history</h2>
+        <h2>Current monthly targets</h2>
+        <p className="section-subtitle">Targets saved for active salespeople.</p>
         <DataTable
-          rows={history.filter((entry) => entry.executive === who)}
+          rows={people}
           columns={[
-            { key: "period", label: "Period" },
-            { key: "target", label: "Target", render: (r) => money(r.target) },
-            { key: "sales", label: "Achieved", render: (r) => money(r.sales) },
-            {
-              key: "pct",
-              label: "Achievement",
-              render: (r) => (
-                <StatusBadge
-                  status={Math.round((r.sales / r.target) * 100) + "%"}
-                />
-              ),
-            },
+            { key: "name", label: "Salesperson" },
+            { key: "target", label: "Monthly target", render: (person) => money(person.target || 0) },
           ]}
         />
       </section>
@@ -513,13 +477,13 @@ export function AnalyticsPage({
 
   const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status));
   const totalSales = wonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
-  const totalTarget = people.reduce((s, p) => s + (Number(p.target) || 0), 0) || 3600000;
+  const totalTarget = people.reduce((s, p) => s + (Number(p.target) || 0), 0);
   const achievementPct = `${Math.round((totalSales / Math.max(1, totalTarget)) * 100)}%`;
   const conversionRate = leads.length > 0 ? `${((wonLeads.length / leads.length) * 100).toFixed(1)}%` : "0%";
 
   const execWonLeads = executive ? leads.filter((l) => l.assigned === executive.name && convertedStatuses.includes(l.status)) : [];
   const execSales = execWonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0) || executive?.sales || 0;
-  const execTarget = executive?.target || 500000;
+  const execTarget = Number(executive?.target) || 0;
 
   const answeredCalls = calls.filter((c) => c.callStatus === "Answered").length;
   const missedCalls = calls.filter((c) => c.callStatus === "Missed").length;
@@ -602,12 +566,21 @@ export function AnalyticsPage({
             </h2>
             <span className="muted">{period}</span>
           </div>
-          <SalesChart
-            period={period}
-            leads={leads}
-            salesTotal={page === "performance" ? execSales : totalSales}
-            targetTotal={page === "performance" ? execTarget : totalTarget}
-          />
+          {(page === "performance" ? !executive : isSales && totalSales === 0 && totalTarget === 0) ? (
+            <EmptyState
+              compact
+              kind="targets"
+              title={isSales ? "No sales data yet" : "No activity yet"}
+              description="Sales and target activity will appear here after your team starts working with leads."
+            />
+          ) : (
+            <SalesChart
+              period={period}
+              leads={leads}
+              salesTotal={page === "performance" ? execSales : totalSales}
+              targetTotal={page === "performance" ? execTarget : totalTarget}
+            />
+          )}
         </section>
         <section className="card detail-card">
           <h2>
@@ -667,7 +640,7 @@ export function AnalyticsPage({
                 return money(won);
               },
             },
-            { key: "target", label: "Target", render: (r) => money(r.target || 500000) },
+            { key: "target", label: "Target", render: (r) => money(Number(r.target) || 0) },
             {
               key: "achievement",
               label: "Achievement",
@@ -675,7 +648,7 @@ export function AnalyticsPage({
                 const won = leads
                   .filter((l) => l.assigned === r.name && convertedStatuses.includes(l.status))
                   .reduce((s, l) => s + (Number(l.saleAmount) || 0), 0) || r.sales || 0;
-                return ((won / Math.max(1, r.target || 500000)) * 100).toFixed(1) + "%";
+                return ((won / Math.max(1, Number(r.target) || 0)) * 100).toFixed(1) + "%";
               },
             },
             {
@@ -1026,4 +999,3 @@ export function TasksPage({ tasks = [], setTasks }) {
     </section>
   );
 }
-

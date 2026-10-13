@@ -39,6 +39,11 @@ export const api = {
     const res = await request("/auth/me");
     return res.success ? res.data : null;
   },
+  async updateProfile(data) {
+    const res = await request("/auth/me", { method: "PATCH", body: JSON.stringify(data) });
+    if (!res.success) throw new Error(res.message || res.error || "Could not update profile");
+    return res.data;
+  },
   logout() {
     sessionStorage.removeItem("entrain-token");
   },

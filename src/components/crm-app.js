@@ -38,6 +38,7 @@ import {
 import Dashboard from "./dashboard";
 import CourseCombobox from "./course-combobox";
 import CoursesPage from "./courses-page";
+import ProfileEditor from "./profile-editor";
 import {
   PageHeader,
   DateRangeFilter,
@@ -188,7 +189,7 @@ function CallModalFields({
   const [customerName, setCustomerName] = useState(modal.record?.name || selectedLead?.name || "");
   const [phone, setPhone] = useState(modal.record?.phone || selectedLead?.phone || "");
   const [service, setService] = useState(modal.record?.service || selectedLead?.service || courses[0]?.name || "");
-  const [agentPhone, setAgentPhone] = useState(authUser?.phone || "+91 98470 12001");
+  const [agentPhone, setAgentPhone] = useState(authUser?.phone || "");
   const [notes, setNotes] = useState(
     typeof modal.record?.notes === "string" && modal.record?.notes !== "[object Object]"
       ? modal.record.notes
@@ -805,7 +806,7 @@ export default function CRMApp() {
     [drawer, setDrawer] = useState(false),
     [dropdown, setDropdown] = useState(""),
     [search, setSearch] = useState(""),
-    [period, setPeriod] = useState("This Month"),
+    [period, setPeriod] = useState("Today"),
     [modal, setModal] = useState(null),
     [toast, setToast] = useState(null),
     [userNotifications, setUserNotifications] = useState([]),
@@ -1884,8 +1885,9 @@ export default function CRMApp() {
             {page === "targets" && (
               <TargetsPage
                 people={people}
-                setPeople={setPeople}
-                notify={notify}
+                onUpdateAccount={updateLeaderboardAccount}
+                canManage={canManageAccounts}
+                onAddSalesperson={canManageAccounts ? () => setModal({ type: "user", context: "leaderboard" }) : null}
               />
             )}
             {page === "staff" && (
@@ -2180,26 +2182,26 @@ export default function CRMApp() {
                 </button>
               </div>
             </form>
+          ) : modal.type === "profile" ? (
+            <ProfileEditor
+              user={authUser}
+              onCancel={() => setModal(null)}
+              onSaved={(saved) => {
+                setAuthUser(saved);
+                setModal(null);
+                notify("Profile updated");
+              }}
+            />
           ) : (
             <div className="profile-detail">
               <UserAvatar name={modal.record?.name || userName} size="large" />
               <h2>{modal.record?.name || userName}</h2>
-              <p>
-                {modal.record?.role || role} ·{" "}
-                Entrain workspace
-              </p>
-              <p>
-                {modal.record?.name?.toLowerCase().replace(" ", ".") ||
-                  "shamil"}
-                @entrain.in
-              </p>
-              <p>+91 98470 12345</p>
-              <StatusBadge status="Active" />
+              <p>{modal.record?.role || role} · Entrain workspace</p>
+              <p>{modal.record?.email || "Email not available"}</p>
+              <p>{modal.record?.phone || "Phone not available"}</p>
+              <StatusBadge status={modal.record?.status || "Active"} />
               {modal.record && (
-                <p>
-                  Sales: {money(modal.record.sales)} · Conversions:{" "}
-                  {modal.record.conversions}
-                </p>
+                <p>Sales: {money(modal.record.sales)} · Conversions: {modal.record.conversions}</p>
               )}
             </div>
           )}

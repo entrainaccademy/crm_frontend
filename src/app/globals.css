@@ -794,6 +794,13 @@ small {
 .leaderboard-card > .section-subtitle {
   padding: 0 20px;
 }
+.leaderboard-message {
+  padding: 36px 20px;
+  color: #61758a;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
 .leaderboard-row {
   display: flex;
   align-items: center;

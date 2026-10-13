@@ -29,6 +29,7 @@ import {
   DataTable,
 } from "./ui";
 import { money, shortMoney, rankExecutives, convertedStatuses } from "@/lib/data";
+import EmptyState from "./empty-state";
 
 export function SalesChart({ period = "This Month", salesTotal, targetTotal, leads = [] }) {
   const days = ["1", "5", "10", "15", "20", "25", "28", "30"];
@@ -36,7 +37,7 @@ export function SalesChart({ period = "This Month", salesTotal, targetTotal, lea
   
   const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status));
   const totalSalesVal = salesTotal ?? wonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
-  const totalTargetVal = targetTotal ?? 3600000;
+  const totalTargetVal = targetTotal ?? 0;
 
   const dynamicChartData = days.map((day, i) => {
     const progress = (i + 1) / days.length;
@@ -178,17 +179,19 @@ export function Leaderboard({ people = [], navigate, loadError = false, salespeo
       <p className="section-subtitle">
         Performance and goal tracking for salespeople.
       </p>
-      {ranked.length === 0 ? (
-        <div className="empty-inline">
-          {loadError
-            ? "Could not load the sales leaderboard. Refresh the page to try again."
-            : salespeopleCount > 0
-              ? "No salespeople are currently shown on the leaderboard."
-              : "No salespeople added yet."}
-          {!loadError && salespeopleCount === 0 && onAddSalesperson && (
-            <button type="button" onClick={onAddSalesperson}>Add salesperson</button>
-          )}
-        </div>
+      {loadError ? (
+        <div className="leaderboard-message" role="alert">Could not load the sales leaderboard. Refresh the page to try again.</div>
+      ) : ranked.length === 0 ? (
+        <EmptyState
+          compact
+          kind="team"
+          title={salespeopleCount > 0 ? "No one on the leaderboard yet" : "No salespeople added yet"}
+          description={salespeopleCount > 0
+            ? "Add an active salesperson to the leaderboard to see their progress here."
+            : "Add a Team Lead or Sales Executive to start tracking sales performance."}
+          action={salespeopleCount === 0 ? "Add salesperson" : null}
+          onAction={onAddSalesperson}
+        />
       ) : (
         ranked.slice(0, 5).map((p, i) => (
           <LeaderboardRow key={p.id || i} person={p} index={i} />
@@ -227,7 +230,7 @@ export default function Dashboard({
   const convertedLeads = wonLeads.length;
 
   const totalAchievedSales = wonLeads.reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
-  const totalTargetSales = people.reduce((sum, p) => sum + (Number(p.target) || 0), 0) || 3600000;
+  const totalTargetSales = people.reduce((sum, p) => sum + (Number(p.target) || 0), 0);
   const overallAchievement = Math.round((totalAchievedSales / Math.max(1, totalTargetSales)) * 100);
 
   const leadsTarget = role === "Sales Executive" ? "my-leads" : "leads";
@@ -350,33 +353,34 @@ export default function Dashboard({
               <option>Sales achieved</option>
             </select>
           </div>
-          <div className="revenue-line">
-            <strong>{money(totalAchievedSales)}</strong>
-            <span className="positive">
-              <ArrowUpRight size={13} />
-              {overallAchievement}%
-            </span>
-            <small>of target</small>
-            <div className="chart-legend">
-              <span>
-                <i />
-                Achieved
-              </span>
-              <span>
-                <i />
-                Target
-              </span>
-            </div>
-          </div>
-          <SalesChart period={period} leads={leads} salesTotal={totalAchievedSales} targetTotal={totalTargetSales} />
-          <div className="chart-footer">
-            <span>
-              Target <strong>{money(totalTargetSales)}</strong>
-            </span>
-            <span>
-              <span className="positive">{overallAchievement}%</span> of target achieved
-            </span>
-          </div>
+          {totalAchievedSales === 0 && totalTargetSales === 0 ? (
+            <EmptyState
+              compact
+              kind="targets"
+              title="No sales activity yet"
+              description="Converted lead revenue and team targets will appear here once your team starts tracking sales."
+            />
+          ) : (
+            <>
+              <div className="revenue-line">
+                <strong>{money(totalAchievedSales)}</strong>
+                <span className="positive">
+                  <ArrowUpRight size={13} />
+                  {overallAchievement}%
+                </span>
+                <small>of target</small>
+                <div className="chart-legend">
+                  <span><i />Achieved</span>
+                  <span><i />Target</span>
+                </div>
+              </div>
+              <SalesChart period={period} leads={leads} salesTotal={totalAchievedSales} targetTotal={totalTargetSales} />
+              <div className="chart-footer">
+                <span>Target <strong>{money(totalTargetSales)}</strong></span>
+                <span><span className="positive">{overallAchievement}%</span> of target achieved</span>
+              </div>
+            </>
+          )}
         </section>
         <Leaderboard people={people} navigate={navigate} loadError={leaderboardLoadError} salespeopleCount={salespeopleCount} onAddSalesperson={onAddSalesperson} />
       </div>
