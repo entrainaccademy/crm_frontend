@@ -347,14 +347,7 @@ export function LeadDetails({ lead, openModal, onDialLead, notify, updateLead, n
         {canEditLead && <button onClick={() => openModal({ type: "lead", record: lead })}>Edit lead</button>}
         {canDeleteLead && <button className="danger-button" onClick={() => openModal({ type: "delete-lead", record: lead })}>Delete lead</button>}
         {!readOnly && <div className="toolbar-right">
-          <button
-            onClick={() => {
-              if (lead?.phone && typeof window !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
-                window.location.href = `tel:${String(lead.phone).replace(/[^\d+]/g, "")}`;
-              }
-              openModal({ type: "call", record: lead });
-            }}
-          >
+          <button onClick={() => onDialLead?.(lead)}>
             <Phone size={15} /> Call
           </button>
           <button
@@ -470,6 +463,7 @@ export function FollowupsPage({
   onComplete,
   onDelete,
   openModal,
+  onDialLead,
   navigate,
   notify,
   readOnly = false,
@@ -547,7 +541,7 @@ export function FollowupsPage({
                   href={`tel:${cleanPhone}`}
                   title={`Call ${r.phone} in mobile dialer`}
                   aria-label={`Call ${r.name || r.phone}`}
-                  onClick={(event) => event.stopPropagation()}
+                  onClick={(event) => { event.stopPropagation(); if (onDialLead) { event.preventDefault(); onDialLead(r); } }}
                 >
                   <Phone size={14} aria-hidden="true" />
                   <span>{r.phone}</span>
@@ -574,10 +568,7 @@ export function FollowupsPage({
                   title="Call & log"
                   onClick={(event) => {
                     event.stopPropagation();
-                    if (r?.phone && typeof window !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
-                      window.location.href = `tel:${String(r.phone).replace(/[^\d+]/g, "")}`;
-                    }
-                    openModal({ type: "call", record: r });
+                    onDialLead?.(r);
                   }}
                 >
                   <Phone size={14} />
@@ -866,6 +857,7 @@ export function CallsPage({
   notify,
   openModal,
   navigate,
+  onDialLead,
   readOnly = false,
   canWorkRecord = () => true,
 }) {
@@ -916,9 +908,9 @@ export function CallsPage({
             {!readOnly && openModal && (
               <button
                 className="primary"
-                onClick={() => openModal({ type: "call" })}
+                onClick={() => openModal({ type: "quick-dial" })}
               >
-                <Plus size={14} /> Log call
+                <Phone size={14} /> Call number
               </button>
             )}
           </div>
@@ -965,7 +957,8 @@ export function CallsPage({
                 <a
                   href={`tel:${r.phone}`}
                   style={{ color: "inherit", textDecoration: "none" }}
-                  title="Click to dial directly"
+                  title="Call and log duration"
+                  onClick={(event) => { if (onDialLead) { event.preventDefault(); onDialLead(r); } }}
                 >
                   {r.phone}
                 </a>
@@ -1043,7 +1036,7 @@ export function CallsPage({
                       aria-label={"Call " + (r.name || "customer")}
                       title="Call customer"
                       onClick={() => {
-                        if (openModal) openModal({ type: "call", record: r });
+                        onDialLead?.(r);
                       }}
                     >
                       <Phone size={14} />

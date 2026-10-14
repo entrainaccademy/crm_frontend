@@ -1190,20 +1190,21 @@ export default function CRMApp() {
   }
 
   function startDialLead(lead) {
-    if (!lead?.phone || !canWorkRecord(lead)) return;
+    if (!lead?.phone || ((lead.customId ?? lead.id) != null && !canWorkRecord(lead))) return;
     if (dialAttempt) {
       notify("Finish or discard the previous call first.", "error");
       return;
     }
     const phone = String(lead.phone).replace(/[^\d+]/g, "");
-    const leadId = Number(lead.customId ?? lead.id);
-    if (!phone || !Number.isInteger(leadId)) {
-      notify("This lead needs a valid phone number and ID before calling.", "error");
+    const rawLeadId = lead.customId ?? lead.id;
+    const leadId = rawLeadId == null ? undefined : Number(rawLeadId);
+    if (!phone || (rawLeadId != null && !Number.isInteger(leadId))) {
+      notify("Enter a valid phone number before calling.", "error");
       return;
     }
     const attempt = {
       leadId,
-      name: lead.name,
+      name: lead.name || lead.phone,
       phone: lead.phone,
       service: lead.service || "",
       assigned: userName,
@@ -1822,9 +1823,9 @@ export default function CRMApp() {
                   <button
                     className="primary"
                     disabled={dataLoading}
-                    onClick={() => setModal({ type: "call" })}
+                    onClick={() => setModal({ type: "quick-dial" })}
                   >
-                    <Plus size={16} /> Log call
+                    <Phone size={16} /> Call number
                   </button>
                 ) : page === "follow-ups" && !readOnly ? (
                   <button
@@ -1919,6 +1920,7 @@ export default function CRMApp() {
             {page === "follow-ups" && (
               <FollowupsPage
                 followups={scopedFollowups}
+                onDialLead={(record) => startDialLead(scopedLeads.find((lead) => String(lead.customId ?? lead.id) === String(record.leadId)) || { name: record.name, phone: record.phone, service: record.service })}
                 onComplete={completeFollowup}
                 onDelete={(followup) => setModal({ type: "delete-followup", record: followup })}
                 openModal={setModal}
@@ -1945,6 +1947,7 @@ export default function CRMApp() {
                 notify={notify}
                 openModal={setModal}
                 navigate={navigate}
+                onDialLead={(record) => startDialLead(scopedLeads.find((lead) => String(lead.customId ?? lead.id) === String(record.leadId)) || { name: record.name, phone: record.phone, service: record.service })}
                 readOnly={readOnly}
                 canWorkRecord={canWorkRecord}
               />
@@ -2027,7 +2030,9 @@ export default function CRMApp() {
       {modal && !["logout", "delete-lead", "delete-followup"].includes(modal.type) && (
         <Modal
           title={
-            modal.type === "call"
+            modal.type === "quick-dial"
+              ? "Call a number"
+              : modal.type === "call"
               ? modal.record
                 ? `Log call: ${modal.record.name || modal.record.phone}`
                 : "Log call"
@@ -2271,7 +2276,19 @@ export default function CRMApp() {
                 </button>
               </div>
             </form>
-          ) : modal.type === "profile" ? (
+          ) : modal.type === "quick-dial" ? (
+              <form className="dial-result-form" onSubmit={(event) => {
+                event.preventDefault();
+                const values = Object.fromEntries(new FormData(event.currentTarget));
+                setModal(null);
+                startDialLead({ name: String(values.name || "").trim(), phone: String(values.phone || "").trim() });
+              }}>
+                <p className="field-hint">Call now, then confirm the duration when you return. You can save a call without adding a lead.</p>
+                <label>Phone number<input name="phone" type="tel" required autoFocus /></label>
+                <label>Name (optional)<input name="name" type="text" /></label>
+                <div className="form-actions"><button type="button" onClick={() => setModal(null)}>Cancel</button><button className="primary" type="submit">Open dialer</button></div>
+              </form>
+            ) : modal.type === "profile" ? (
             <ProfileEditor
               user={authUser}
               onCancel={() => setModal(null)}
