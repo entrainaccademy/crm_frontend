@@ -99,7 +99,7 @@ const navGroups = [
     [
       ["leaderboard", "Leaderboard", Trophy],
       ["targets", "Targets", Target],
-      // ["calls", "Calls", Phone],
+      ["calls", "Calls", Phone],
     ],
   ],
   [
