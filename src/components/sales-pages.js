@@ -48,7 +48,7 @@ const followupAssigneeColor = (index) => {
 };
 const PAGE_SIZE = 10;
 
-export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = false, canEditLead = () => true, canDeleteLead = false, canAssignLead = false }) {
+export function LeadsPage({ leads, navigate, openModal, onDialLead, exportData, readOnly = false, canEditLead = () => true, canDeleteLead = false, canAssignLead = false }) {
   const [search, setSearch] = useState(""),
     [filters, setFilters] = useState(false),
     [status, setStatus] = useState(""),
@@ -72,11 +72,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
   );
   const callLead = (event, lead) => {
     event.stopPropagation();
-    if (lead?.phone && typeof window !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
-      const cleanPhone = String(lead.phone).replace(/[^\d+]/g, "");
-      window.location.href = `tel:${cleanPhone}`;
-    }
-    openModal({ type: "call", record: lead });
+    onDialLead?.(lead);
   };
   return (
     <section className="card leads-table-card">
@@ -196,6 +192,10 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
                   aria-label={`Call ${r.name || r.phone}`}
                   onClick={(event) => {
                     event.stopPropagation();
+                    if (onDialLead) {
+                      event.preventDefault();
+                      onDialLead(r);
+                    }
                   }}
                 >
                   <Phone size={14} aria-hidden="true" />
@@ -275,7 +275,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
     </section>
   );
 }
-export function LeadDetails({ lead, openModal, notify, updateLead, navigate, readOnly = false, canEditLead = false, canDeleteLead = false, canAssignLead = false }) {
+export function LeadDetails({ lead, openModal, onDialLead, notify, updateLead, navigate, readOnly = false, canEditLead = false, canDeleteLead = false, canAssignLead = false }) {
   const [note, setNote] = useState("");
   if (!lead) return <EmptyState title="Lead not found" />;
   const info = (title, fields) => (
@@ -290,7 +290,7 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
                 <a
                   href={`tel:${String(value).replace(/[^\d+]/g, "")}`}
                   className="lead-phone-call"
-                  title="Call in mobile dialer"
+                  title="Call in mobile dialer" onClick={(event) => { if (onDialLead) { event.preventDefault(); onDialLead(lead); } }}
                 >
                   <Phone size={13} aria-hidden="true" /> {value}
                 </a>
@@ -330,7 +330,7 @@ export function LeadDetails({ lead, openModal, notify, updateLead, navigate, rea
                 href={`tel:${String(lead.phone).replace(/[^\d+]/g, "")}`}
                 className="lead-phone-call"
                 style={{ padding: "2px 8px", fontSize: "13px", verticalAlign: "middle", marginRight: "6px" }}
-                title="Call in mobile dialer"
+                title="Call in mobile dialer" onClick={(event) => { if (onDialLead) { event.preventDefault(); onDialLead(lead); } }}
               >
                 <Phone size={13} aria-hidden="true" /> {lead.phone}
               </a>
@@ -882,6 +882,13 @@ export function CallsPage({
   const missed = rows.filter((c) => c.callStatus === "Missed").length;
   const outgoing = rows.filter((c) => c.direction === "Outgoing").length;
   const recorded = rows.filter((c) => c.recordingStatus === "Available" || c.recordingUrl || c.recordingSid).length;
+  const totalSeconds = rows.reduce((sum, call) => {
+    if (Number.isFinite(call.durationSeconds)) return sum + call.durationSeconds;
+    const parts = String(call.duration || "00:00").split(":").map(Number);
+    return sum + (parts.length === 2 && parts.every(Number.isFinite) ? parts[0] * 60 + parts[1] : 0);
+  }, 0);
+  const averageSeconds = rows.length ? Math.round(totalSeconds / rows.length) : 0;
+  const averageDuration = `${String(Math.floor(averageSeconds / 60)).padStart(2, "0")}:${String(averageSeconds % 60).padStart(2, "0")}`;
 
   return (
     <>
@@ -892,7 +899,7 @@ export function CallsPage({
           ["Missed calls", missed],
           ["Outgoing calls", outgoing],
           ["Recorded calls", recorded],
-          ["Average duration", rows.length > 0 ? "03:45" : "00:00"],
+          ["Average duration", averageDuration],
         ].map(([label, value]) => (
           <StatCard key={label} label={label} value={value} icon={Phone} />
         ))}

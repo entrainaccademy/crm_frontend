@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import Dashboard from "./dashboard";
 import CourseCombobox from "./course-combobox";
+import DialResultForm from "./DialResultForm";
 import CoursesPage from "./courses-page";
 import ProfileEditor from "./profile-editor";
 import {
@@ -787,6 +788,8 @@ export default function CRMApp() {
     [leads, setLeads] = useState([]),
     [followups, setFollowups] = useState([]),
     [callsState, setCallsState] = useState([]),
+    [dialAttempt, setDialAttempt] = useState(null),
+    [dialSaving, setDialSaving] = useState(false),
     [tasks, setTasks] = useState([]),
     [people, setPeople] = useState([]),
     [leaderboardPeople, setLeaderboardPeople] = useState([]),
@@ -811,6 +814,21 @@ export default function CRMApp() {
     [toast, setToast] = useState(null),
     [userNotifications, setUserNotifications] = useState([]),
     [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    if (!authUser?._id) return;
+    try {
+      const stored = sessionStorage.getItem(`crm-pending-dial:${authUser._id}`);
+      if (!stored) return;
+      const attempt = JSON.parse(stored);
+      if (attempt?.startedAt && Date.now() - attempt.startedAt < 24 * 60 * 60 * 1000) {
+        setDialAttempt(attempt);
+      } else {
+        sessionStorage.removeItem(`crm-pending-dial:${authUser._id}`);
+      }
+    } catch {
+      sessionStorage.removeItem(`crm-pending-dial:${authUser._id}`);
+    }
+  }, [authUser?._id]);
   const notificationButtonRef = useRef(null);
   const formSavingRef = useRef(false);
   const notificationPanelRef = useRef(null);
@@ -1164,6 +1182,64 @@ export default function CRMApp() {
       notify(`${format === "xlsx" ? "Excel" : format.toUpperCase()} export is ready`);
     } catch (error) {
       notify(error.message || "Could not export records", "error");
+    }
+  }
+  function discardDialAttempt() {
+    if (authUser?._id) sessionStorage.removeItem(`crm-pending-dial:${authUser._id}`);
+    setDialAttempt(null);
+  }
+
+  function startDialLead(lead) {
+    if (!lead?.phone || !canWorkRecord(lead)) return;
+    if (dialAttempt) {
+      notify("Finish or discard the previous call first.", "error");
+      return;
+    }
+    const phone = String(lead.phone).replace(/[^\d+]/g, "");
+    const leadId = Number(lead.customId ?? lead.id);
+    if (!phone || !Number.isInteger(leadId)) {
+      notify("This lead needs a valid phone number and ID before calling.", "error");
+      return;
+    }
+    const attempt = {
+      leadId,
+      name: lead.name,
+      phone: lead.phone,
+      service: lead.service || "",
+      assigned: userName,
+      startedAt: Date.now(),
+    };
+    sessionStorage.setItem(`crm-pending-dial:${authUser._id}`, JSON.stringify(attempt));
+    setDialAttempt(attempt);
+    window.location.href = `tel:${phone}`;
+  }
+
+  async function saveDialDuration({ status, duration, notes }) {
+    if (!dialAttempt || dialSaving) return;
+    setDialSaving(true);
+    try {
+      const started = new Date(dialAttempt.startedAt);
+      const saved = await api.createCall({
+        leadId: dialAttempt.leadId,
+        name: dialAttempt.name,
+        phone: dialAttempt.phone,
+        service: dialAttempt.service,
+        assigned: dialAttempt.assigned,
+        direction: "Outgoing",
+        callStatus: status,
+        duration,
+        callDate: started.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+        callTime: started.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        notes,
+      });
+      if (!saved) throw new Error("Could not save call duration.");
+      setCallsState((previous) => [normalizeCall(saved), ...previous]);
+      discardDialAttempt();
+      notify("Call duration saved to Calls");
+    } catch (error) {
+      notify(error.message || "Could not save call duration. Please try again.", "error");
+    } finally {
+      setDialSaving(false);
     }
   }
   async function saveForm(e) {
@@ -1810,6 +1886,7 @@ export default function CRMApp() {
               (detailId ? (
                 <LeadDetails
                   lead={scopedLeads.find((l) => l.id === detailId)}
+                  onDialLead={role === "Super Admin" ? undefined : startDialLead}
                   openModal={setModal}
                   notify={notify}
                   updateLead={updateLead}
@@ -1831,6 +1908,7 @@ export default function CRMApp() {
                   }
                   navigate={navigate}
                   openModal={setModal}
+                  onDialLead={role === "Super Admin" ? undefined : startDialLead}
                   exportData={exportData}
                   readOnly={role === "Super Admin"}
                   canEditLead={canEditLead}
@@ -1935,6 +2013,17 @@ export default function CRMApp() {
           </>
         )}
       </main>
+      {dialAttempt && (
+        <Modal title={`Finish call: ${dialAttempt.name}`} onClose={dialSaving ? () => {} : discardDialAttempt}>
+          <DialResultForm
+            key={dialAttempt.startedAt}
+            attempt={dialAttempt}
+            saving={dialSaving}
+            onSave={saveDialDuration}
+            onDiscard={discardDialAttempt}
+          />
+        </Modal>
+      )}
       {modal && !["logout", "delete-lead", "delete-followup"].includes(modal.type) && (
         <Modal
           title={
