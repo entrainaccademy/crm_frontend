@@ -173,7 +173,7 @@ export function LeadsPage({ leads, navigate, openModal, onDialLead, exportData, 
                 <UserAvatar name={r.name} index={r.id} />
                 <div>
                   <strong>{r.name}</strong>
-                  <small>{r.location.split(",")[0]}</small>
+                  <small>{r.location ? String(r.location).split(",")[0] : "Location not set"}</small>
                 </div>
               </div>
             ),
