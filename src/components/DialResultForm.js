@@ -7,16 +7,17 @@ function formatElapsed(seconds) {
   return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
 }
 
-export default function DialResultForm({ attempt, saving, onSave, onDiscard }) {
-  const [elapsed, setElapsed] = useState(() => Math.max(0, Math.floor((Date.now() - attempt.startedAt) / 1000)));
+export default function DialResultForm({ attempt, saving, onStop, onSave, onDiscard }) {
+  const [elapsed, setElapsed] = useState(() => Math.max(0, Math.floor(((attempt.endedAt || Date.now()) - attempt.startedAt) / 1000)));
   const [status, setStatus] = useState("");
   const [duration, setDuration] = useState("");
   const [durationEdited, setDurationEdited] = useState(false);
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    const update = () => setElapsed(Math.max(0, Math.floor((Date.now() - attempt.startedAt) / 1000)));
+    const update = () => setElapsed(Math.max(0, Math.floor(((attempt.endedAt || Date.now()) - attempt.startedAt) / 1000)));
     update();
+    if (attempt.endedAt) return;
     const timer = setInterval(update, 1000);
     document.addEventListener("visibilitychange", update);
     window.addEventListener("focus", update);
@@ -25,7 +26,7 @@ export default function DialResultForm({ attempt, saving, onSave, onDiscard }) {
       document.removeEventListener("visibilitychange", update);
       window.removeEventListener("focus", update);
     };
-  }, [attempt.startedAt]);
+  }, [attempt.startedAt, attempt.endedAt]);
 
   const suggestedDuration = formatElapsed(elapsed);
   const shownDuration = durationEdited ? duration : suggestedDuration;
@@ -35,6 +36,7 @@ export default function DialResultForm({ attempt, saving, onSave, onDiscard }) {
     event.preventDefault();
     const confirmedDuration = noConversation ? "00:00" : shownDuration.trim();
     if (!/^\d+:[0-5]\d$/.test(confirmedDuration)) return;
+    if (!attempt.endedAt) return;
     onSave({ status, duration: confirmedDuration, notes: notes.trim() });
   };
 
@@ -42,9 +44,12 @@ export default function DialResultForm({ attempt, saving, onSave, onDiscard }) {
     <form className="dial-result-form" onSubmit={submit}>
       <p><strong>{attempt.name}</strong> · {attempt.phone}</p>
       <p className="field-hint">
-        Time since opening the dialer: {suggestedDuration}. Your browser cannot tell when the phone call connected or ended.
-        Confirm the actual duration from your phone before saving.
+        {attempt.endedAt ? "Timer stopped" : "Time since opening the dialer"}: {suggestedDuration}.
+        Your browser cannot detect when the phone call connects or ends. Check your phone and correct the duration before saving.
       </p>
+      {!attempt.endedAt && (
+        <button type="button" onClick={() => onStop(Date.now())} disabled={saving}>Call ended — stop timer</button>
+      )}
       <label>
         Call result
         <select value={status} onChange={(event) => setStatus(event.target.value)} required>
@@ -73,7 +78,7 @@ export default function DialResultForm({ attempt, saving, onSave, onDiscard }) {
       </label>
       <div className="form-actions">
         <button type="button" onClick={onDiscard} disabled={saving}>Discard</button>
-        <button type="submit" className="primary" disabled={saving || !status}>{saving ? "Saving…" : "Save duration"}</button>
+        <button type="submit" className="primary" disabled={saving || !status || !attempt.endedAt}>{saving ? "Saving…" : "Save duration"}</button>
       </div>
     </form>
   );

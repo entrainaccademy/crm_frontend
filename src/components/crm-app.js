@@ -1241,6 +1241,13 @@ export default function CRMApp() {
     window.location.href = `tel:${phone}`;
   }
 
+  function stopDialAttempt(endedAt) {
+    if (!dialAttempt || dialAttempt.endedAt || !authUser?._id) return;
+    const stopped = { ...dialAttempt, endedAt };
+    sessionStorage.setItem(`crm-pending-dial:${authUser._id}`, JSON.stringify(stopped));
+    setDialAttempt(stopped);
+  }
+
   async function saveDialDuration({ status, duration, notes }) {
     if (!dialAttempt || dialSaving) return;
     setDialSaving(true);
@@ -2061,6 +2068,7 @@ export default function CRMApp() {
             key={dialAttempt.startedAt}
             attempt={dialAttempt}
             saving={dialSaving}
+            onStop={stopDialAttempt}
             onSave={saveDialDuration}
             onDiscard={discardDialAttempt}
           />
