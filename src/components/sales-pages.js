@@ -48,6 +48,11 @@ const followupAssigneeColor = (index) => {
 };
 const PAGE_SIZE = 10;
 
+function TableNotes({ notes }) {
+  const text = getNoteText(notes);
+  return text ? <span className="table-notes">{text}</span> : <span className="muted">—</span>;
+}
+
 export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = false, canEditLead = () => true, canDeleteLead = false, canAssignLead = false }) {
   const [search, setSearch] = useState(""),
     [filters, setFilters] = useState(false),
@@ -217,6 +222,7 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
             render: (r) => money(r.advanceAmount ?? 0),
           },
           { key: "assigned", label: "Assigned to" },
+          { key: "notes", label: "Notes", render: (r) => <TableNotes notes={r.notes} /> },
           {
             key: "status",
             label: "Status",
@@ -278,181 +284,104 @@ export function LeadsPage({ leads, navigate, openModal, exportData, readOnly = f
 export function LeadDetails({ lead, openModal, notify, updateLead, navigate, readOnly = false, canEditLead = false, canDeleteLead = false, canAssignLead = false }) {
   const [note, setNote] = useState("");
   if (!lead) return <EmptyState title="Lead not found" />;
-  const info = (title, fields) => (
-    <section className="card detail-card">
-      <h2>{title}</h2>
-      <dl>
-        {fields.map(([key, value]) => (
-          <div key={key}>
-            <dt>{key}</dt>
-            <dd>
-              {key === "Phone" && value ? (
-                <a
-                  href={`tel:${String(value).replace(/[^\d+]/g, "")}`}
-                  className="lead-phone-call"
-                  title="Call in mobile dialer"
-                >
-                  <Phone size={13} aria-hidden="true" /> {value}
-                </a>
-              ) : key === "WhatsApp" && value ? (
-                <a
-                  href={`https://wa.me/${String(value).replace(/\D/g, "")}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: "#16a34a", fontWeight: 500 }}
-                >
-                  {value}
-                </a>
-              ) : (
-                value
-              )}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
+
+  const saleAmount = Number(lead.saleAmount) || 0;
+  const advanceAmount = Number(lead.advanceAmount) || 0;
+  const whatsapp = String(lead.whatsapp || "").replace(/\D/g, "");
+  const phone = String(lead.phone || "").replace(/\D/g, "");
+  const extraDetails = [
+    ["Email", lead.email],
+    ["Location", lead.location],
+    ["Priority", lead.priority],
+    ["WhatsApp", whatsapp && whatsapp !== phone ? lead.whatsapp : ""],
+    ["Created", lead.created],
+    ["Sale amount", saleAmount > 0 ? money(saleAmount) : ""],
+    ["Advance paid", advanceAmount > 0 ? money(advanceAmount) : ""],
+    ["Balance due", saleAmount > advanceAmount ? money(saleAmount - advanceAmount) : ""],
+  ].filter(([, value]) => value);
+
   return (
-    <>
-      <button
-        className="text-button back-button"
-        onClick={() => navigate("leads")}
-      >
+    <div className="lead-detail-page">
+      <button className="text-button back-button" onClick={() => navigate("leads")}>
         <ArrowLeft size={15} /> Back to leads
       </button>
-      <section className="card lead-hero">
-        <UserAvatar name={lead.name} size="large" />
-        <div>
-          <h1>{lead.name}</h1>
-          <p>
-            {lead.phone ? (
-              <a
-                href={`tel:${String(lead.phone).replace(/[^\d+]/g, "")}`}
-                className="lead-phone-call"
-                style={{ padding: "2px 8px", fontSize: "13px", verticalAlign: "middle", marginRight: "6px" }}
-                title="Call in mobile dialer"
-              >
-                <Phone size={13} aria-hidden="true" /> {lead.phone}
-              </a>
-            ) : "No phone"}{" "}
-            · Assigned to {lead.assigned}
-          </p>
-        </div>
-        <StatusBadge status={lead.status} />
-        {canAssignLead && (
-          <button className="primary" onClick={() => openModal({ type: "assignment", record: lead })}>
-            Assign lead
-          </button>
-        )}
-        {canEditLead && <button onClick={() => openModal({ type: "lead", record: lead })}>Edit lead</button>}
-        {canDeleteLead && <button className="danger-button" onClick={() => openModal({ type: "delete-lead", record: lead })}>Delete lead</button>}
-        {!readOnly && <div className="toolbar-right">
-          <button
-            onClick={() => {
-              if (lead?.phone && typeof window !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
-                window.location.href = `tel:${String(lead.phone).replace(/[^\d+]/g, "")}`;
-              }
-              openModal({ type: "call", record: lead });
-            }}
-          >
-            <Phone size={15} /> Call
-          </button>
-          <button
-            onClick={() => {
-              const num = (lead.whatsapp || lead.phone || "").replace(/\D/g, "");
-              if (num) {
-                window.open(`https://wa.me/${num}`, "_blank");
-              } else {
-                notify("No phone number found for WhatsApp.", "error");
-              }
-            }}
-          >
-            <MessageCircle size={15} /> WhatsApp
-          </button>
-          <button
-            className="primary"
-            onClick={() => openModal({ type: "followup", lead })}
-          >
-            <Plus size={15} /> Follow-up
-          </button>
-        </div>}
-      </section>
-      <div className="details-grid">
-        <div>
-          {info("Customer information", [
-            ["Name", lead.name],
-            ["Phone", lead.phone],
-            ["WhatsApp", lead.whatsapp],
-            ["Email", lead.email],
-            ["Location", lead.location],
-          ])}
-          {info("Lead information", [
-            ["Lead source", lead.source],
-            ["Course", lead.service],
-            ["Priority", lead.priority || "No priority"],
-            ["Assigned to", lead.assigned],
-            ["Created", lead.created],
-          ])}
-          {info("Payment information", [
-            ["Sale amount", money(lead.saleAmount ?? 0)],
-            ["Advance amount", money(lead.advanceAmount ?? 0)],
-            [
-              "Balance due",
-              money(
-                Math.max(0, (lead.saleAmount ?? 0) - (lead.advanceAmount ?? 0)),
-              ),
-            ],
-          ])}
-        </div>
-        <div>
-          {info("Follow-up information", [
-            ["Next follow-up", lead.date ? lead.date + " · " + (lead.time || "") : "Not scheduled"],
-            ["Reason", "Discuss course admission"],
-            ["Assigned person", lead.assigned],
-          ])}
-          <section className="card detail-card">
-            <h2>Notes</h2>
-            {lead.notes.map((n, i) => (
-              <div className="note" key={i}>
-                {typeof n === "string" ? n : n.text}
-                <small>Just now · You</small>
-              </div>
-            ))}
-            {!readOnly && <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (note.trim()) {
-                  const saved = await updateLead({
-                    ...lead,
-                    notes: [...lead.notes, { text: note, author: "User" }],
-                    activities: [
-                      ...lead.activities,
-                      { text: "Note added: " + note, time: "Just now" },
-                    ],
-                  });
-                  if (saved) setNote("");
+      <section className="card lead-record-card">
+        <div className="table-toolbar lead-record-toolbar">
+          <div className="lead-record-title">
+            <UserAvatar name={lead.name} />
+            <div><h1>{lead.name}</h1><span>Lead details</span></div>
+          </div>
+          <div className="lead-record-actions">
+            {!readOnly && <>
+              <button onClick={() => {
+                if (lead?.phone && typeof window !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
+                  window.location.href = "tel:" + String(lead.phone).replace(/[^\d+]/g, "");
                 }
-              }}
-            >
-              <textarea
-                aria-label="Add note"
-                placeholder="Add a note about this conversation…"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                required
-              />
-              <button className="primary" type="submit">
-                Add note
+                openModal({ type: "call", record: lead });
+              }}><Phone size={15} /> Call</button>
+              <button onClick={() => {
+                const num = (lead.whatsapp || lead.phone || "").replace(/\D/g, "");
+                if (num) window.open("https://wa.me/" + num, "_blank");
+                else notify("No phone number found for WhatsApp.", "error");
+              }}><MessageCircle size={15} /> WhatsApp</button>
+              <button className="primary" onClick={() => openModal({ type: "followup", lead })}>
+                <Plus size={15} /> Follow-up
               </button>
-            </form>}
-          </section>
+            </>}
+            {(canAssignLead || canEditLead || canDeleteLead) && (
+              <details className="lead-more-actions">
+                <summary>More actions</summary>
+                <div>
+                  {canAssignLead && <button onClick={() => openModal({ type: "assignment", record: lead })}>Assign lead</button>}
+                  {canEditLead && <button onClick={() => openModal({ type: "lead", record: lead })}>Edit lead</button>}
+                  {canDeleteLead && <button className="danger-button" onClick={() => openModal({ type: "delete-lead", record: lead })}>Delete lead</button>}
+                </div>
+              </details>
+            )}
+          </div>
         </div>
-        <section className="card detail-card">
-          <h2>Activity timeline</h2>
-          <ActivityTimeline items={lead.activities} />
-        </section>
-      </div>
-    </>
+        <div className="form-grid lead-view-grid">
+          <label>Phone number<span className="lead-view-value">{lead.phone ? <a href={"tel:" + String(lead.phone).replace(/[^\d+]/g, "")}>{lead.phone}</a> : "—"}</span></label>
+          <label>Interested course<span className="lead-view-value">{lead.service || "—"}</span></label>
+          <label>Lead source<span className="lead-view-value">{lead.source || "—"}</span></label>
+          <label>Assigned to<span className="lead-view-value">{lead.assigned || "—"}</span></label>
+          <label>Status<span className="lead-view-value"><StatusBadge status={lead.status} /></span></label>
+          <label>Next follow-up<span className="lead-view-value">{lead.date ? lead.date + (lead.time ? " · " + lead.time : "") : "Not scheduled"}</span></label>
+        </div>
+        <div className="lead-record-notes">
+          <h2>Notes</h2>
+          {lead.notes?.length ? lead.notes.map((n, i) => (
+            <div className="note" key={i}>{typeof n === "string" ? n : n.text}</div>
+          )) : <p className="muted">No notes yet.</p>}
+          {!readOnly && <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (note.trim()) {
+              const saved = await updateLead({
+                ...lead,
+                notes: [...(lead.notes || []), { text: note, author: "User" }],
+                activities: [...(lead.activities || []), { text: "Note added: " + note, time: "Just now" }],
+              });
+              if (saved) setNote("");
+            }
+          }}>
+            <textarea aria-label="Add note" placeholder="Add a note…" value={note} onChange={(e) => setNote(e.target.value)} required />
+            <button className="primary" type="submit">Add note</button>
+          </form>}
+        </div>
+        {(extraDetails.length > 0 || lead.activities?.length > 0) && (
+          <div className="lead-record-disclosures">
+            {extraDetails.length > 0 && <details>
+              <summary>More details</summary>
+              <dl>{extraDetails.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>
+            </details>}
+            {lead.activities?.length > 0 && <details>
+              <summary>Activity history ({lead.activities.length})</summary>
+              <ActivityTimeline items={lead.activities} />
+            </details>}
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 export function FollowupsPage({
@@ -509,7 +438,7 @@ export function FollowupsPage({
       </div>
       <DataTable
         rows={rows.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
-        onRow={(r) => navigate("leads/" + r.leadId)}
+        onRow={(r) => !readOnly && canWorkRecord(r) ? openModal({ type: "followup", record: r }) : navigate("leads/" + r.leadId)}
         rowClassName={() => "followup-assignee-row"}
         rowStyle={(followup) => {
           const [background, hover, accent] = assigneeColors.get(followup.assigned) || ["#f8fafc", "#eef2f6", "#aab8c6"];
@@ -549,6 +478,7 @@ export function FollowupsPage({
           { key: "date", label: "Follow-up date" },
           { key: "time", label: "Time" },
           { key: "purpose", label: "Purpose" },
+          { key: "notes", label: "Notes", render: (r) => <TableNotes notes={r.notes} /> },
           {
             key: "status",
             label: "Status",

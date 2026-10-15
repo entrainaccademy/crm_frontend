@@ -53,7 +53,7 @@ export const normalizeLead = (lead) => {
   const saleAmount = Number(lead?.saleAmount ?? 0);
   return {
     ...lead,
-    id: lead.id || lead.customId || lead._id,
+    id: lead.customId ?? lead.id ?? lead._id,
     service,
     saleAmount,
     advanceAmount: Number(
