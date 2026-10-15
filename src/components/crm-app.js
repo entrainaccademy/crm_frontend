@@ -723,6 +723,31 @@ function CallModalFields({
   );
 }
 
+function LeadNoteField({ notes = [] }) {
+  const savedNotes = Array.isArray(notes) ? notes : [];
+  const latestNote = getNoteText([...savedNotes].reverse().find((note) => getNoteText(note)));
+  const [mode, setMode] = useState(latestNote ? "edit" : "add");
+  const [text, setText] = useState(latestNote);
+
+  return (
+    <div className="lead-note-field">
+      <label>
+        {mode === "edit" ? "Edit note" : "Add note"}
+        <textarea name="initialNote" value={text} onChange={(event) => setText(event.target.value)} />
+      </label>
+      <input type="hidden" name="noteMode" value={mode} />
+      {latestNote && (
+        <button type="button" onClick={() => {
+          setMode(mode === "edit" ? "add" : "edit");
+          setText(mode === "edit" ? "" : latestNote);
+        }}>
+          {mode === "edit" ? "Add another note" : "Edit latest note"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function WorkspaceSkeleton({ page }) {
   const tablePage = ["users", "staff", "leads", "my-leads", "follow-ups", "calls", "customers"].includes(page);
   return (
@@ -1075,6 +1100,7 @@ export default function CRMApp() {
   const scopedLeads = leads.filter(
     (l) => !scopedNames || scopedNames.includes(l.assigned),
   );
+  const detailLead = detailId ? scopedLeads.find((lead) => String(lead.id) === String(detailId)) : null;
   const scopedFollowups = followups.filter(
     (l) => !scopedNames || scopedNames.includes(l.assigned),
   );
@@ -1312,7 +1338,7 @@ export default function CRMApp() {
         };
         const createdLead = await api.createLead(newLead);
         if (createdLead) {
-          setLeads((prev) => prev.some((item) => String(item.id) === String(createdLead.id || createdLead.customId))
+          setLeads((prev) => prev.some((item) => String(item.id) === String(createdLead.customId ?? createdLead.id))
             ? prev : [normalizeLead(createdLead), ...prev]);
         }
       }
@@ -1361,8 +1387,24 @@ export default function CRMApp() {
         notify("Enter valid amounts. If a sale amount is set, the advance cannot exceed it.", "error");
         return;
       }
-      const newNote = String(data.initialNote || "").trim();
+      const noteText = String(data.initialNote || "").trim();
+      const noteMode = data.noteMode;
       delete data.initialNote;
+      delete data.noteMode;
+      const savedNotes = Array.isArray(modal.record?.notes) ? [...modal.record.notes] : [];
+      const latestNoteIndex = savedNotes.findLastIndex((note) => Boolean(getNoteText(note)));
+      if (noteMode === "edit" && latestNoteIndex >= 0) {
+        const previousNote = savedNotes[latestNoteIndex];
+        if (noteText) {
+          savedNotes[latestNoteIndex] = typeof previousNote === "string"
+            ? noteText
+            : { ...previousNote, text: noteText };
+        } else {
+          savedNotes.splice(latestNoteIndex, 1);
+        }
+      } else if (noteText) {
+        savedNotes.push({ text: noteText, author: userName });
+      }
       const lead = {
         ...modal.record,
         ...data,
@@ -1375,10 +1417,7 @@ export default function CRMApp() {
         created: modal.record?.created || todayStr,
         date: role === "Data Analytics Manager" && !modal.record ? "" : (data.date ?? modal.record?.date ?? todayStr),
         time: role === "Data Analytics Manager" && !modal.record ? "" : (data.time ?? modal.record?.time ?? "10:30"),
-        notes: [
-          ...(modal.record?.notes || []),
-          ...(newNote ? [{ text: newNote, author: userName }] : []),
-        ],
+        notes: savedNotes,
         activities: modal.record?.activities || [
           { text: "Lead created for " + data.service, time: "Just now" },
           { text: "Assigned to " + data.assigned, time: "Just now" },
@@ -1399,7 +1438,7 @@ export default function CRMApp() {
       } else {
         const saved = await api.createLead(lead);
         if (!saved) { notify("Could not add lead. Please try again.", "error"); return; }
-        setLeads((prev) => prev.some((item) => String(item.id) === String(saved.id || saved.customId))
+        setLeads((prev) => prev.some((item) => String(item.id) === String(saved.customId ?? saved.id))
           ? prev : [normalizeLead(saved), ...prev]);
       }
       const updatedFollowups = await api.getFollowups();
@@ -1886,14 +1925,14 @@ export default function CRMApp() {
             ) : ["leads", "my-leads"].includes(page) &&
               (detailId ? (
                 <LeadDetails
-                  lead={scopedLeads.find((l) => l.id === detailId)}
+                  lead={detailLead}
                   onDialLead={role === "Super Admin" ? undefined : startDialLead}
                   openModal={setModal}
                   notify={notify}
                   updateLead={updateLead}
                   navigate={navigate}
-                  readOnly={readOnly || !canEditLead(scopedLeads.find((l) => l.id === detailId))}
-                  canEditLead={canEditLead(scopedLeads.find((l) => l.id === detailId))}
+                  readOnly={readOnly || !canEditLead(detailLead)}
+                  canEditLead={canEditLead(detailLead)}
                   canDeleteLead={canDeleteLead}
                   canAssignLead={canAssignLead}
                 />
@@ -2044,7 +2083,7 @@ export default function CRMApp() {
                 ? "Assign lead"
               : modal.type === "followup"
                 ? modal.record
-                  ? "Reschedule follow-up"
+                  ? "Edit follow-up"
                   : "Add follow-up"
                 : modal.type === "user"
                   ? modal.record
@@ -2179,28 +2218,37 @@ export default function CRMApp() {
                         defaultValue={modal.record?.advanceAmount ?? ""}
                       />
                     </label>
-                    {field("Add note", "initialNote", "textarea")}
+                    <LeadNoteField key={modal.record?.id || "new-lead"} notes={modal.record?.notes} />
                   </>
                 )}
                 {modal.type === "followup" && (
                   <>
-                    <label>
-                      Customer
-                      <select
-                        name="leadId"
-                        defaultValue={
-                          modal.record?.leadId ||
-                          modal.lead?.id ||
-                          scopedLeads.find((lead) => canWorkRecord(lead))?.id
-                        }
-                      >
-                        {scopedLeads.filter((lead) => canWorkRecord(lead)).map((l) => (
-                          <option value={l.id} key={l.id}>
-                            {l.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    {modal.record ? (
+                      <label>
+                        Customer
+                        <input type="hidden" name="leadId" value={modal.record.leadId || ""} />
+                        <span className="lead-view-value">
+                          {modal.record.name || "Unknown"} · {modal.record.phone || "No phone"}
+                        </span>
+                      </label>
+                    ) : (
+                      <label>
+                        Customer
+                        <select
+                          name="leadId"
+                          defaultValue={
+                            modal.lead?.id ||
+                            scopedLeads.find((lead) => canWorkRecord(lead))?.id
+                          }
+                        >
+                          {scopedLeads.filter((lead) => canWorkRecord(lead)).map((l) => (
+                            <option value={l.id} key={l.id}>
+                              {l.name} · {l.phone || "No phone"}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                     {field("Follow-up type", "type", "text", [
                       "Call",
                       "WhatsApp",

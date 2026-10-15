@@ -96,8 +96,8 @@ export function LeaderboardPage({ accounts = [], canManage = false, onAddPerson,
           icon={TrendingUp}
         />
         <StatCard
-          label="Highest conversions"
-          value={Math.max(0, ...ranked.map((p) => p.conversions))}
+          label="Total conversions"
+          value={ranked.reduce((total, person) => total + (Number(person.conversions) || 0), 0)}
           icon={Users}
         />
         <StatCard

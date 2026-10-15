@@ -1340,6 +1340,154 @@ td small {
   margin-top: 6px;
   font-size: 11px;
 }
+.lead-record-card {
+  overflow: visible;
+}
+.lead-record-toolbar {
+  border-bottom: 1px solid #e0e7ed;
+  flex-wrap: wrap;
+}
+.lead-record-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lead-record-title h1 {
+  font-size: 20px;
+  line-height: 1.2;
+  color: #17345a;
+}
+.lead-record-title span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #7b8da0;
+}
+.lead-record-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.lead-more-actions {
+  position: relative;
+}
+.lead-more-actions summary {
+  cursor: pointer;
+  color: #315e8d;
+  font-size: 12px;
+  padding: 9px 4px;
+}
+.lead-more-actions[open] > div {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  top: 100%;
+  min-width: 155px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #dbe4ed;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #19385722;
+  display: grid;
+  gap: 6px;
+}
+.lead-more-actions button {
+  width: 100%;
+  white-space: nowrap;
+}
+.lead-view-grid {
+  padding: 20px 24px;
+  gap: 16px 20px;
+  border-bottom: 1px solid #e0e7ed;
+}
+.lead-view-grid label {
+  color: #60758c;
+  font-size: 13px;
+}
+.lead-view-value {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid #d9e2ec;
+  border-radius: 6px;
+  background: #fff;
+  color: #344c65;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.lead-view-value a {
+  color: #315d8c;
+}
+.lead-view-value a:hover {
+  text-decoration: underline;
+}
+@media (max-width: 760px) {
+  .lead-view-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.lead-record-notes {
+  padding: 20px;
+  border-bottom: 1px solid #e0e7ed;
+}
+.lead-record-notes h2 {
+  margin-bottom: 12px;
+}
+.lead-record-notes .note {
+  max-width: 760px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.lead-record-notes .muted {
+  margin-bottom: 12px;
+}
+.lead-record-notes form {
+  max-width: 760px;
+}
+.lead-record-notes textarea {
+  min-height: 72px;
+}
+.lead-record-notes form > button {
+  margin-top: 10px;
+}
+.lead-record-disclosures {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0 28px;
+  padding: 14px 20px;
+}
+.lead-record-disclosures > details {
+  min-width: 180px;
+  max-width: 500px;
+}
+.lead-record-disclosures summary {
+  cursor: pointer;
+  color: #315e8d;
+  font-size: 13px;
+  font-weight: 600;
+}
+.lead-record-disclosures dl,
+.lead-record-disclosures .timeline {
+  margin-top: 14px;
+}
+.lead-record-disclosures dl > div {
+  gap: 24px;
+  border-bottom: 1px solid #eef1f4;
+}
+.lead-record-disclosures dd {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 850px) {
+  .lead-record-toolbar {
+    align-items: flex-start;
+  }
+  .lead-record-actions {
+    width: 100%;
+  }
+}
 .details-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -2826,6 +2974,20 @@ td small {
   line-height: 1.4;
 }
 
+.lead-note-field {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.lead-note-field label,
+.lead-note-field textarea {
+  width: 100%;
+}
+.lead-note-field > button {
+  font-size: 12px;
+}
 /* Lead list scrolls within its card; toolbar and pagination remain in view. */
 .main:has(.leads-table-card) {
   height: calc(100dvh - var(--header));
@@ -3531,6 +3693,16 @@ textarea {
   font-weight: 400;
   border-bottom-color: #e0e7ed;
 }
+.leads-table-card .table-notes,
+.followups-table-card .table-notes {
+  display: inline-block;
+  min-width: 160px;
+  max-width: 280px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
 .leads-table-card .table-scroll tbody td strong,
 .followups-table-card .table-scroll tbody td strong {
   color: #23384d;
