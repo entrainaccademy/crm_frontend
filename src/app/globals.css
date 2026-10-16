@@ -1157,6 +1157,14 @@ td small {
   padding: 0;
   border: 0;
 }
+.followups-table-card > .table-toolbar {
+  flex-wrap: wrap;
+}
+.followups-table-card > .table-toolbar > .filter-row {
+  align-items: center;
+  justify-content: flex-end;
+  margin-left: auto;
+}
 .lead-date-range,
 .lead-date-range label {
   display: inline-flex;

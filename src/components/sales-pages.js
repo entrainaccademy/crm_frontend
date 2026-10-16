@@ -400,22 +400,32 @@ export function FollowupsPage({
   canWorkRecord = () => true,
 }) {
   const [tab, setTab] = useState("All");
+  const [search, setSearch] = useState("");
+  const [assigned, setAssigned] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [pendingId, setPendingId] = useState(null);
   const todayStr = new Date().toISOString().split("T")[0];
   const followupStatus = (followup) =>
     followup.completed ? "Completed" : followup.date && followup.date < todayStr ? "Overdue" : "Scheduled";
+  const query = search.trim().toLowerCase();
   const rows = followups.filter((f) =>
-    tab === "All"
+    (tab === "All"
       ? true
       : tab === "Completed"
-      ? f.completed
-      : !f.completed &&
-        (tab === "Today"
-          ? f.date === todayStr || !f.date
-          : tab === "Upcoming"
-            ? f.date > todayStr
-            : f.date < todayStr),
+        ? f.completed
+        : !f.completed &&
+          (tab === "Today"
+            ? f.date === todayStr || !f.date
+            : tab === "Upcoming"
+              ? f.date > todayStr
+              : f.date < todayStr)) &&
+    (!query || [f.name, f.phone, f.purpose, getNoteText(f.notes)]
+      .some((value) => String(value || "").toLowerCase().includes(query))) &&
+    (!assigned || (assigned === "Unassigned" ? !f.assigned : f.assigned === assigned)) &&
+    (!dateFrom || (f.date && f.date >= dateFrom)) &&
+    (!dateTo || (f.date && f.date <= dateTo)),
   );
   const assigneeColors = new Map(
     [...new Set(followups.map((followup) => followup.assigned).filter(Boolean))]
@@ -440,6 +450,38 @@ export function FollowupsPage({
             {t}
           </button>
         ))}
+      </div>
+      <div className="table-toolbar">
+        <SearchInput
+          value={search}
+          onChange={(value) => { setSearch(value); setPage(1); }}
+          placeholder="Search customer, phone or notes…"
+        />
+        <div className="filter-row">
+          <FilterDropdown
+            value={assigned}
+            onChange={(value) => { setAssigned(value); setPage(1); }}
+            options={[
+              ...new Set(followups.map((followup) => followup.assigned).filter(Boolean)),
+              ...(followups.some((followup) => !followup.assigned) ? ["Unassigned"] : []),
+            ].sort((a, b) => a.localeCompare(b))}
+            label="Assignee"
+            allLabel="All assignees"
+          />
+          <div className="lead-date-range" role="group" aria-label="Follow-up date range">
+            <span>Follow-up date</span>
+            <label>
+              From
+              <input type="date" aria-label="Follow-up from date" value={dateFrom} max={dateTo || undefined}
+                onChange={(event) => { setDateFrom(event.target.value); setPage(1); }} />
+            </label>
+            <label>
+              To
+              <input type="date" aria-label="Follow-up to date" value={dateTo} min={dateFrom || undefined}
+                onChange={(event) => { setDateTo(event.target.value); setPage(1); }} />
+            </label>
+          </div>
+        </div>
       </div>
       <DataTable
         rows={rows.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
