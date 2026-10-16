@@ -1217,6 +1217,7 @@ td small {
   border-radius: 50%;
   background: currentColor;
 }
+.badge-leads,
 .badge-new,
 .badge-contacted,
 .badge-cold {
@@ -1295,6 +1296,16 @@ td small {
 }
 .row-actions .lead-action-icon:hover {
   background: #edf2f8;
+}
+.row-actions .lead-whatsapp-action {
+  color: #1f7a45;
+}
+.row-actions .lead-whatsapp-action:hover:not(:disabled) {
+  background: #e9f7ee;
+}
+.row-actions .lead-whatsapp-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .row-actions .lead-action-icon.danger-button:hover {
   background: #fff4f4;
@@ -3096,7 +3107,7 @@ td small {
 }
 
 @media (max-width: 760px) {
-  /* Keep the calls table usable beneath its six compact summary cards. */
+  /* Keep the calls table usable beneath its compact summary cards. */
   .main.table-page > .stats-grid.six {
     display: flex;
     overflow-x: auto;
@@ -3109,6 +3120,21 @@ td small {
   }
 }
 
+.stats-grid.calls-stats {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+@media (max-width: 1350px) {
+  .main.table-page > .stats-grid.calls-stats {
+    display: flex;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding-bottom: 8px;
+    gap: 10px;
+  }
+  .main.table-page > .stats-grid.calls-stats > .stat-card {
+    flex: 0 0 145px;
+  }
+}
 /* Pipeline workspace: stage headers stay in view while each column scrolls. */
 .main:has(.pipeline-workspace) {
   height: calc(100dvh - var(--header));
@@ -3595,6 +3621,7 @@ textarea {
 .table-scroll tbody tr:hover {
   background: #f8fafd;
 }
+.badge-leads,
 .badge-new,
 .badge-contacted,
 .badge-cold {
@@ -3644,6 +3671,7 @@ textarea {
 .leads-table-card .table-scroll tbody tr.lead-status-row td:first-child {
   box-shadow: inset 4px 0 var(--lead-row-accent, #aab8c6);
 }
+.lead-status-leads,
 .lead-status-new,
 .lead-status-contacted {
   --lead-row-bg: #f5f9ff;
@@ -3701,6 +3729,29 @@ textarea {
   font-weight: 400;
   border-bottom-color: #e0e7ed;
 }
+/* Keep ten lead rows easier to scan on shorter laptop screens. */
+.leads-table-card .table-scroll thead th {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.leads-table-card .table-scroll tbody td {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.leads-table-card .table-scroll .person-cell .avatar {
+  width: 28px;
+  height: 28px;
+}
+.leads-table-card .table-scroll .person-cell small {
+  margin-top: 2px;
+}
+.leads-table-card .row-actions .lead-action-icon {
+  width: 30px;
+  height: 30px;
+}
+.leads-table-card .lead-phone-call {
+  padding: 2px 6px;
+}
 .leads-table-card .table-notes,
 .followups-table-card .table-notes {
   display: inline-block;
@@ -3716,6 +3767,9 @@ textarea {
   color: #23384d;
   font-weight: 600;
 }
+.leads-table-card .table-scroll .person-cell strong {
+  font-weight: 500;
+}
 .leads-table-card .table-scroll tbody td small,
 .followups-table-card .table-scroll tbody td small {
   color: #61758a;
@@ -3727,6 +3781,7 @@ textarea {
 .leads-table-card .badge-no-status {
   color: #40566d;
 }
+.leads-table-card .badge-leads,
 .leads-table-card .badge-new,
 .leads-table-card .badge-contacted {
   color: #295a8e;

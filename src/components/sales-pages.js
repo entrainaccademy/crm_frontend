@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Phone,
-  MessageCircle,
   ArrowLeft,
   Mail,
   MapPin,
@@ -29,7 +28,7 @@ import {
   StatCard,
   EmptyState,
 } from "./ui";
-import { statuses, sources, priorities, closedStatuses, calls, money, getNoteText } from "@/lib/data";
+import { statuses, sources, priorities, closedStatuses, calls, money, getNoteText, isCallToday } from "@/lib/data";
 import { AudioPlayer } from "./AudioPlayer";
 const followupAssigneePalette = [
   ["#f8f5ff", "#f0eafd", "#9a82cc"],
@@ -51,6 +50,11 @@ const PAGE_SIZE = 10;
 function TableNotes({ notes }) {
   const text = getNoteText(notes);
   return text ? <span className="table-notes">{text}</span> : <span className="muted">—</span>;
+}
+
+function whatsappNumberFor(lead) {
+  const digits = String(lead.whatsapp || lead.phone || "").replace(/\D/g, "");
+  return digits.length === 10 ? "91" + digits : digits;
 }
 
 export function LeadsPage({ leads, navigate, openModal, onDialLead, exportData, readOnly = false, canEditLead = () => true, canDeleteLead = false, canAssignLead = false }) {
@@ -212,6 +216,15 @@ export function LeadsPage({ leads, navigate, openModal, onDialLead, exportData, 
           },
           { key: "source", label: "Source" },
           { key: "service", label: "Course" },
+          { key: "assigned", label: "Assigned to" },
+          {
+            key: "status",
+            label: "Lead status",
+            render: (r) => <StatusBadge status={r.status} />,
+          },
+          { key: "created", label: "Date" },
+          { key: "date", label: "Follow-up date", render: (r) => r.date || "Not scheduled" },
+          { key: "notes", label: "Notes", render: (r) => <TableNotes notes={r.notes} /> },
           {
             key: "saleAmount",
             label: "Sale amount",
@@ -222,21 +235,22 @@ export function LeadsPage({ leads, navigate, openModal, onDialLead, exportData, 
             label: "Advance amount",
             render: (r) => money(r.advanceAmount ?? 0),
           },
-          { key: "assigned", label: "Assigned to" },
-          { key: "notes", label: "Notes", render: (r) => <TableNotes notes={r.notes} /> },
-          {
-            key: "status",
-            label: "Status",
-            render: (r) => <StatusBadge status={r.status} />,
-          },
-          { key: "date", label: "Next follow-up", render: (r) => r.date || "Not scheduled" },
-          { key: "created", label: "Created date" },
           (!readOnly || canAssignLead || canDeleteLead) && {
             key: "actions",
             label: "Actions",
             render: (r) => (
               <div className="row-actions">
                 {!readOnly && <button className="lead-action-icon" aria-label={`Call ${r.name}`} title="Call & log" onClick={(event) => callLead(event, r)}><Phone size={16} aria-hidden="true" /></button>}
+                {!readOnly && <button
+                  className="lead-action-icon lead-whatsapp-action"
+                  aria-label={`WhatsApp ${r.name}`}
+                  title={whatsappNumberFor(r) ? "Open WhatsApp chat" : "No WhatsApp or phone number"}
+                  disabled={!whatsappNumberFor(r)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    window.open("https://wa.me/" + whatsappNumberFor(r), "_blank", "noopener,noreferrer");
+                  }}
+                ><img src="/images/whatsapp-glyph.svg" width="18" height="18" alt="" aria-hidden="true" /></button>}
                 {canEditLead(r) && <button className="lead-action-icon" aria-label={`Edit ${r.name}`} title="Edit lead" onClick={(event) => {
                   event.stopPropagation();
                   openModal({ type: "lead", record: r });
@@ -316,10 +330,10 @@ export function LeadDetails({ lead, openModal, onDialLead, notify, updateLead, n
             {!readOnly && <>
               <button onClick={() => onDialLead ? onDialLead(lead) : openModal({ type: "call", record: lead })}><Phone size={15} /> Call</button>
               <button onClick={() => {
-                const num = (lead.whatsapp || lead.phone || "").replace(/\D/g, "");
+                const num = whatsappNumberFor(lead);
                 if (num) window.open("https://wa.me/" + num, "_blank");
                 else notify("No phone number found for WhatsApp.", "error");
-              }}><MessageCircle size={15} /> WhatsApp</button>
+              }}><img src="/images/whatsapp-glyph.svg" width="18" height="18" alt="" aria-hidden="true" /> WhatsApp</button>
               <button className="primary" onClick={() => openModal({ type: "followup", lead })}>
                 <Plus size={15} /> Follow-up
               </button>
@@ -836,7 +850,8 @@ export function CallsPage({
   canWorkRecord = () => true,
 }) {
   const [search, setSearch] = useState("");
-  const rows = (calls || []).filter(
+  const [todayOnly, setTodayOnly] = useState(false);
+  const matchingCalls = (calls || []).filter(
     (c) =>
       (!allowedNames || allowedNames.includes(c.assigned)) &&
       ((c.name || "") + (c.phone || "") + (c.assigned || "") + (getNoteText(c.notes) || ""))
@@ -844,6 +859,9 @@ export function CallsPage({
         .includes(search.toLowerCase()),
   );
 
+  const todaysCalls = matchingCalls.filter((call) => isCallToday(call));
+  const callsToday = todaysCalls.length;
+  const rows = todayOnly ? todaysCalls : matchingCalls;
   const answered = rows.filter((c) => c.callStatus === "Answered").length;
   const missed = rows.filter((c) => c.callStatus === "Missed").length;
   const outgoing = rows.filter((c) => c.direction === "Outgoing").length;
@@ -858,9 +876,10 @@ export function CallsPage({
 
   return (
     <>
-      <div className="stats-grid six">
+      <div className="stats-grid six calls-stats">
         {[
           ["Total calls", rows.length],
+          ["Calls today", callsToday],
           ["Answered calls", answered],
           ["Missed calls", missed],
           ["Outgoing calls", outgoing],
@@ -878,7 +897,13 @@ export function CallsPage({
             placeholder="Search calls, numbers, notes…"
           />
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <span className="muted">Call records</span>
+            <button
+              type="button"
+              className={`filter-chip${todayOnly ? " active" : ""}`}
+              aria-pressed={todayOnly}
+              onClick={() => setTodayOnly((active) => !active)}
+            >Today</button>
+            <span className="muted">{todayOnly ? "Today's call records" : "Call records"}</span>
             {!readOnly && openModal && (
               <button
                 className="primary"
@@ -999,11 +1024,12 @@ export function CallsPage({
             },
             !readOnly && {
               key: "action",
-              label: "Action",
+              label: "Actions",
               render: (r) => {
                 const lead = (leads || []).find(
                   (l) => String(l.id) === String(r.leadId) || (l.phone && r.phone && l.phone === r.phone),
                 );
+                const whatsappNumber = whatsappNumberFor({ whatsapp: lead?.whatsapp, phone: r.phone || lead?.phone });
                 return canWorkRecord(r) ? (
                   <div className="row-actions" style={{ display: "flex", gap: "6px" }}>
                     <button
@@ -1015,6 +1041,15 @@ export function CallsPage({
                       }}
                     >
                       <Phone size={14} />
+                    </button>
+                    <button
+                      className="lead-action-icon lead-whatsapp-action"
+                      aria-label={"WhatsApp " + (r.name || r.phone || "customer")}
+                      title={whatsappNumber ? "Open WhatsApp chat" : "No WhatsApp or phone number"}
+                      disabled={!whatsappNumber}
+                      onClick={() => window.open("https://wa.me/" + whatsappNumber, "_blank", "noopener,noreferrer")}
+                    >
+                      <img src="/images/whatsapp-glyph.svg" width="18" height="18" alt="" aria-hidden="true" />
                     </button>
                     {!lead && openModal && (
                       <button

@@ -1919,6 +1919,7 @@ export default function CRMApp() {
                 staff={users}
                 followups={scopedFollowups}
                 calls={callsState}
+                allowedNames={scopedNames}
                 navigate={navigate}
                 period={period}
               />
@@ -2121,7 +2122,20 @@ export default function CRMApp() {
                 {modal.type === "lead" && (
                   <>
                     {field("Customer name", "name")}
-                    {field("Phone number", "phone", "tel")}
+                    {modal.record ? field("Phone number", "phone", "tel") : (
+                      <label>
+                        Phone number
+                        <input
+                          name="phone"
+                          type="tel"
+                          inputMode="numeric"
+                          autoComplete="tel-national"
+                          required
+                          pattern="[0-9]{10}"
+                          title="Enter exactly 10 digits"
+                        />
+                      </label>
+                    )}
                     {field("WhatsApp number", "whatsapp", "tel")}
                     {field("Email", "email", "email")}
                     {field("Location", "location")}

@@ -26,6 +26,7 @@ export const rankExecutives = (people = []) =>
   });
 
 export const statuses = [
+  "Leads",
   "Not Connected",
   "Contacted",
   "Follow-up",
@@ -88,6 +89,19 @@ export const getNoteText = (notes) => {
   return String(notes).trim();
 };
 
+export const isCallToday = (call, today = new Date()) => {
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayLabel = today.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const callDate = String(call.callDate || "").trim();
+  if (callDate) return callDate === todayIso || callDate === todayLabel || callDate === "Today";
+  const timestamp = call.startedAt || call.createdAt;
+  if (!timestamp) return false;
+  const date = new Date(timestamp);
+  return !Number.isNaN(date.getTime()) &&
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate();
+};
 export const normalizeCall = (call) => {
   if (!call) return null;
   return {

@@ -28,7 +28,7 @@ import {
   StatusBadge,
   DataTable,
 } from "./ui";
-import { money, shortMoney, rankExecutives, convertedStatuses } from "@/lib/data";
+import { money, shortMoney, rankExecutives, convertedStatuses, isCallToday } from "@/lib/data";
 import EmptyState from "./empty-state";
 
 export function SalesChart({ period = "This Month", salesTotal, targetTotal, leads = [] }) {
@@ -216,16 +216,21 @@ export default function Dashboard({
   staff = [],
   followups = [],
   calls = [],
+  allowedNames,
   navigate,
   period = "This Month",
 }) {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todaysCalls = calls.filter((call) =>
+    (!allowedNames || allowedNames.includes(call.assigned)) && isCallToday(call, today)
+  );
 
   const totalLeads = leads.length;
   const leadsAddedToday = leads.filter((lead) => lead.created === todayStr).length;
   const followupsToday = followups.filter((f) => !f.completed && f.date === todayStr).length;
   const overdueFollowups = followups.filter((f) => !f.completed && f.date < todayStr).length;
-  const callsToday = calls.filter((c) => c.callDate === todayStr || c.callDate === "Today").length || calls.length;
+  const callsToday = todaysCalls.length;
   const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status));
   const convertedLeads = wonLeads.length;
 
@@ -240,7 +245,7 @@ export default function Dashboard({
     ["Added today", leadsAddedToday, leadsAddedToday > 0 ? `${leadsAddedToday} added` : "None added", UserPlus, () => navigate?.(leadsTarget)],
     ["Follow-ups today", followupsToday, followupsToday > 0 ? "Due today" : "None due", CalendarClock, () => navigate?.("follow-ups")],
     ["Overdue follow-ups", overdueFollowups, overdueFollowups > 0 ? "Action needed" : "Up to date", Clock, () => navigate?.("follow-ups")],
-    ["Calls logged", callsToday, `${calls.length} total`, Phone],
+    ["Calls today", callsToday, callsToday > 0 ? "Logged today" : "None logged", Phone, () => navigate?.("calls")],
     ["Converted leads", convertedLeads, totalLeads > 0 ? `${Math.round((convertedLeads / totalLeads) * 100)}% conv.` : "0%", CheckCircle2, () => navigate?.("pipeline")],
   ];
 
@@ -384,6 +389,29 @@ export default function Dashboard({
         </section>
         <Leaderboard people={people} navigate={navigate} loadError={leaderboardLoadError} salespeopleCount={salespeopleCount} onAddSalesperson={onAddSalesperson} />
       </div>
+      <section className="card">
+        <div className="section-heading">
+          <div>
+            <h2>Today's calls</h2>
+            <p className="section-subtitle">Calls logged today</p>
+          </div>
+          <button onClick={() => navigate("calls")}>View all calls <ArrowRight size={14} /></button>
+        </div>
+        {todaysCalls.length ? (
+          <DataTable
+            rows={todaysCalls.slice(0, 5)}
+            columns={[
+              { key: "name", label: "Customer", render: (call) => call.name || "Unknown caller" },
+              { key: "phone", label: "Phone", render: (call) => call.phone || "—" },
+              { key: "assigned", label: "Assigned to" },
+              { key: "callTime", label: "Time" },
+              { key: "callStatus", label: "Status", render: (call) => <StatusBadge status={call.callStatus} /> },
+            ]}
+          />
+        ) : (
+          <p className="muted" style={{ padding: "20px" }}>No calls logged today.</p>
+        )}
+      </section>
     </>
   );
 }
