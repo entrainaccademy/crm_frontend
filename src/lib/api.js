@@ -75,6 +75,22 @@ export const api = {
     const res = await request(`/leads${query ? `?${query}` : ""}`);
     return res.success ? res.data : null;
   },
+  async getAllLeads() {
+    const pageSize = 250;
+    const first = await request(`/leads?page=1&limit=${pageSize}`);
+    if (!first.success || !Array.isArray(first.data)) return null;
+
+    const total = Number(first.total);
+    if (!Number.isFinite(total) || total <= first.data.length) return first.data;
+
+    const leads = [...first.data];
+    for (let page = 2; page <= Math.ceil(total / pageSize); page++) {
+      const next = await request(`/leads?page=${page}&limit=${pageSize}`);
+      if (!next.success || !Array.isArray(next.data)) return null;
+      leads.push(...next.data);
+    }
+    return leads;
+  },
   async getLead(id) {
     const res = await request(`/leads/${id}`);
     return res.success ? res.data : null;

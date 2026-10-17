@@ -948,7 +948,7 @@ export default function CRMApp() {
         const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
         const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
         const fetchAll = () => Promise.all([
-          api.getLeads(),
+          api.getAllLeads(),
           api.getFollowups(),
           api.getCalls(),
           api.getTasks(),
@@ -1041,7 +1041,7 @@ export default function CRMApp() {
     if (!authUser || !["leads", "my-leads"].includes(page) || dataLoading) return;
     let cancelled = false;
     setLeadsRefreshing(true);
-    api.getLeads().then((items) => {
+    api.getAllLeads().then((items) => {
       if (cancelled) return;
       if (Array.isArray(items)) {
         setLeads(items.map(normalizeLead));
