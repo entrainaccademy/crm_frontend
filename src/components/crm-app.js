@@ -1250,7 +1250,7 @@ export default function CRMApp() {
     setDialAttempt(stopped);
   }
 
-  async function saveDialDuration({ status, duration, notes }) {
+  async function saveDialDuration({ status, duration }) {
     if (!dialAttempt || dialSaving) return;
     setDialSaving(true);
     try {
@@ -1266,7 +1266,6 @@ export default function CRMApp() {
         duration,
         callDate: started.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
         callTime: started.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-        notes,
       });
       if (!saved) throw new Error("Could not save call duration.");
       setCallsState((previous) => [normalizeCall(saved), ...previous]);

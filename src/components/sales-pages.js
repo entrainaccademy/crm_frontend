@@ -47,6 +47,14 @@ const followupAssigneeColor = (index) => {
 };
 const PAGE_SIZE = 10;
 
+function callDateKey(call) {
+  const label = String(call.callDate || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(label)) return label;
+  const date = label === "Today" ? new Date() : new Date(label || call.startedAt || call.createdAt || "");
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function TableNotes({ notes }) {
   const text = getNoteText(notes);
   return text ? <span className="table-notes">{text}</span> : <span className="muted">—</span>;
@@ -851,6 +859,12 @@ export function CallsPage({
 }) {
   const [search, setSearch] = useState("");
   const [todayOnly, setTodayOnly] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [status, setStatus] = useState("");
+  const [direction, setDirection] = useState("");
+  const [assigned, setAssigned] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const matchingCalls = (calls || []).filter(
     (c) =>
       (!allowedNames || allowedNames.includes(c.assigned)) &&
@@ -859,9 +873,16 @@ export function CallsPage({
         .includes(search.toLowerCase()),
   );
 
-  const todaysCalls = matchingCalls.filter((call) => isCallToday(call));
+  const filteredCalls = matchingCalls.filter((call) =>
+    (!status || call.callStatus === status) &&
+    (!direction || call.direction === direction) &&
+    (!assigned || (assigned === "Unassigned" ? !call.assigned || call.assigned === "Unassigned" : call.assigned === assigned)) &&
+    (!dateFrom || callDateKey(call) >= dateFrom) &&
+    (!dateTo || (callDateKey(call) && callDateKey(call) <= dateTo)),
+  );
+  const todaysCalls = filteredCalls.filter((call) => isCallToday(call));
   const callsToday = todaysCalls.length;
-  const rows = todayOnly ? todaysCalls : matchingCalls;
+  const rows = todayOnly ? todaysCalls : filteredCalls;
   const answered = rows.filter((c) => c.callStatus === "Answered").length;
   const missed = rows.filter((c) => c.callStatus === "Missed").length;
   const outgoing = rows.filter((c) => c.direction === "Outgoing").length;
@@ -897,6 +918,9 @@ export function CallsPage({
             placeholder="Search calls, numbers, notes…"
           />
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <button type="button" aria-expanded={showFilters} onClick={() => setShowFilters((open) => !open)}>
+              <SlidersHorizontal size={15} /> Filters
+            </button>
             <button
               type="button"
               className={`filter-chip${todayOnly ? " active" : ""}`}
@@ -914,6 +938,35 @@ export function CallsPage({
             )}
           </div>
         </div>
+        {showFilters && (
+          <div className="filter-row">
+            <FilterDropdown value={status} onChange={setStatus}
+              options={[...new Set(matchingCalls.map((call) => call.callStatus).filter(Boolean))].sort()}
+              label="Call result" allLabel="All results" />
+            <FilterDropdown value={direction} onChange={setDirection}
+              options={[...new Set(matchingCalls.map((call) => call.direction).filter(Boolean))].sort()}
+              label="Direction" allLabel="All directions" />
+            <FilterDropdown value={assigned} onChange={setAssigned}
+              options={[...new Set(matchingCalls.map((call) => call.assigned || "Unassigned"))].sort()}
+              label="Assignee" allLabel="All assignees" />
+            <div className="lead-date-range" role="group" aria-label="Call date range">
+              <span>Call date</span>
+              <label>From
+                <input type="date" aria-label="Call from date" value={dateFrom} max={dateTo || undefined}
+                  onChange={(event) => setDateFrom(event.target.value)} />
+              </label>
+              <label>To
+                <input type="date" aria-label="Call to date" value={dateTo} min={dateFrom || undefined}
+                  onChange={(event) => setDateTo(event.target.value)} />
+              </label>
+            </div>
+            {(status || direction || assigned || dateFrom || dateTo || todayOnly) && (
+              <button type="button" onClick={() => {
+                setStatus(""); setDirection(""); setAssigned(""); setDateFrom(""); setDateTo(""); setTodayOnly(false);
+              }}>Clear filters</button>
+            )}
+          </div>
+        )}
         <DataTable
           rows={rows}
           columns={[

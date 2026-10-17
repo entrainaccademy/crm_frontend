@@ -12,7 +12,6 @@ export default function DialResultForm({ attempt, saving, onStop, onSave, onDisc
   const [status, setStatus] = useState("");
   const [duration, setDuration] = useState("");
   const [durationEdited, setDurationEdited] = useState(false);
-  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     const update = () => setElapsed(Math.max(0, Math.floor(((attempt.endedAt || Date.now()) - attempt.startedAt) / 1000)));
@@ -37,7 +36,7 @@ export default function DialResultForm({ attempt, saving, onStop, onSave, onDisc
     const confirmedDuration = noConversation ? "00:00" : shownDuration.trim();
     if (!/^\d+:[0-5]\d$/.test(confirmedDuration)) return;
     if (!attempt.endedAt) return;
-    onSave({ status, duration: confirmedDuration, notes: notes.trim() });
+    onSave({ status, duration: confirmedDuration });
   };
 
   return (
@@ -71,10 +70,6 @@ export default function DialResultForm({ attempt, saving, onStop, onSave, onDisc
           disabled={noConversation}
           required
         />
-      </label>
-      <label>
-        Notes (optional)
-        <textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
       </label>
       <div className="form-actions">
         <button type="button" onClick={onDiscard} disabled={saving}>Discard</button>
