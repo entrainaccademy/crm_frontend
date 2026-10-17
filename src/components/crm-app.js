@@ -37,6 +37,8 @@ import {
 } from "lucide-react";
 import Dashboard from "./dashboard";
 import CourseCombobox from "./course-combobox";
+import { LeadPhoneField } from "./lead-phone-field";
+import { isPossiblePhoneNumber } from "react-phone-number-input";
 import DialResultForm from "./DialResultForm";
 import CoursesPage from "./courses-page";
 import ProfileEditor from "./profile-editor";
@@ -1372,6 +1374,17 @@ export default function CRMApp() {
         notify("You do not have permission to save this lead.", "error");
         return;
       }
+      for (const name of ["phone", "whatsapp"]) {
+        const number = String(data[name] || "").trim();
+        const countryCode = String(data[`${name}CountryCode`] || "").trim();
+        if (!number && name === "whatsapp") {
+          data[name] = "";
+        } else if (!/^\+[1-9]\d{0,2}$/.test(countryCode) || !number.startsWith(countryCode) || !isPossiblePhoneNumber(number)) {
+          notify(`Enter a valid ${name === "phone" ? "phone" : "WhatsApp"} number for the selected country.`, "error");
+          return;
+        }
+        data[`${name}CountryCode`] = countryCode;
+      }
       const saleAmount = Number(data.saleAmount),
         advanceAmount = Number(data.advanceAmount);
       const selectedCourse = courses.find((course) => course.name === data.service);
@@ -2122,21 +2135,8 @@ export default function CRMApp() {
                 {modal.type === "lead" && (
                   <>
                     {field("Customer name", "name")}
-                    {modal.record ? field("Phone number", "phone", "tel") : (
-                      <label>
-                        Phone number
-                        <input
-                          name="phone"
-                          type="tel"
-                          inputMode="numeric"
-                          autoComplete="tel-national"
-                          required
-                          pattern="[0-9]{10}"
-                          title="Enter exactly 10 digits"
-                        />
-                      </label>
-                    )}
-                    {field("WhatsApp number", "whatsapp", "tel")}
+                    <LeadPhoneField label="Phone number" name="phone" value={modal.record?.phone} required />
+                    <LeadPhoneField label="WhatsApp number" name="whatsapp" value={modal.record?.whatsapp} />
                     {field("Email", "email", "email")}
                     {field("Location", "location")}
                     <div className="course-field">
