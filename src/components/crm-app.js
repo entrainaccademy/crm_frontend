@@ -2002,6 +2002,8 @@ export default function CRMApp() {
               <CallsPage
                 calls={callsState}
                 leads={scopedLeads}
+                staff={users}
+                viewerName={userName}
                 allowedNames={scopedNames}
                 notify={notify}
                 openModal={setModal}

@@ -849,6 +849,8 @@ export function PipelinePage({ leads, navigate, updateLead, readOnly = false, ca
 export function CallsPage({
   calls = [],
   leads = [],
+  staff = [],
+  viewerName,
   allowedNames,
   notify,
   openModal,
@@ -881,6 +883,37 @@ export function CallsPage({
     (!dateTo || (callDateKey(call) && callDateKey(call) <= dateTo)),
   );
   const todaysCalls = filteredCalls.filter((call) => isCallToday(call));
+  const personActivity = new Map();
+  const visibleStaff = staff.filter((person) =>
+    ["Sales Executive", "Team Lead"].includes(person.role) &&
+    person.status === "Active" &&
+    (!allowedNames || allowedNames.includes(person.name))
+  );
+  if (allowedNames && viewerName && !visibleStaff.some((person) => person.name === viewerName)) {
+    visibleStaff.push({ name: viewerName });
+  }
+  for (const person of visibleStaff) {
+    personActivity.set(person.name.trim().toLocaleLowerCase(), {
+      name: person.name, total: 0, answered: 0, other: 0, latest: null,
+    });
+  }
+  for (const call of calls) {
+    if ((allowedNames && !allowedNames.includes(call.assigned)) || !isCallToday(call)) continue;
+    const name = String(call.assigned || "Unassigned").trim() || "Unassigned";
+    const key = name.toLocaleLowerCase();
+    const activity = personActivity.get(key) || { name, total: 0, answered: 0, other: 0, latest: null };
+    activity.total += 1;
+    if (["Answered", "Completed"].includes(call.callStatus)) activity.answered += 1;
+    else activity.other += 1;
+    const timestamp = new Date(call.startedAt || call.createdAt || 0).getTime() || 0;
+    if (!activity.latest || timestamp > activity.latest.timestamp) {
+      activity.latest = { timestamp, time: call.callTime || "—" };
+    }
+    personActivity.set(key, activity);
+  }
+  const peopleCallActivity = [...personActivity.values()].sort((a, b) =>
+    b.total - a.total || a.name.localeCompare(b.name)
+  );
   const callsToday = todaysCalls.length;
   const rows = todayOnly ? todaysCalls : filteredCalls;
   const answered = rows.filter((c) => c.callStatus === "Answered").length;
@@ -910,6 +943,32 @@ export function CallsPage({
           <StatCard key={label} label={label} value={value} icon={Phone} />
         ))}
       </div>
+      <section className="calls-people-summary" aria-label="Calls by person today">
+        <div className="calls-people-heading">
+          <h2>Calls by person today</h2>
+          <span>{peopleCallActivity.length} {peopleCallActivity.length === 1 ? "person" : "people"}</span>
+        </div>
+        {peopleCallActivity.length ? (
+          <div className="calls-people-list">
+            {peopleCallActivity.map((person) => (
+              <div className="calls-person-card" key={person.name}>
+                <div className="person-cell">
+                  <UserAvatar name={person.name} />
+                  <strong>{person.name}</strong>
+                </div>
+                <div className="calls-person-total"><strong>{person.total}</strong> calls today</div>
+                <div className="calls-person-details">
+                  <span>{person.answered} answered</span>
+                  <span>{person.other} other outcomes</span>
+                  <span>Last call: {person.latest?.time || "—"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">No call activity to show today.</p>
+        )}
+      </section>
       <section className="card">
         <div className="table-toolbar">
           <SearchInput

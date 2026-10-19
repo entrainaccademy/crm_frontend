@@ -3193,6 +3193,100 @@ td small {
 .stats-grid.calls-stats {
   grid-template-columns: repeat(7, minmax(0, 1fr));
 }
+.calls-people-summary {
+  flex-shrink: 0;
+  min-width: 0;
+  margin: 0 0 14px;
+}
+.calls-people-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 10px;
+}
+.calls-people-heading h2 {
+  color: #193955;
+  font-size: 15px;
+  font-weight: 700;
+}
+.calls-people-heading > span {
+  flex-shrink: 0;
+  color: #78879a;
+  font-size: 11px;
+}
+.calls-people-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 1px 1px 6px;
+}
+.calls-person-card {
+  flex: 0 0 225px;
+  min-width: 0;
+  padding: 12px 14px;
+  background: linear-gradient(160deg, #f4f8fe 0%, #fff 52%);
+  border: 1px solid #dce6f1;
+  border-top: 3px solid #426ca5;
+  border-radius: 10px;
+  box-shadow: 0 3px 10px #183b6209;
+}
+.calls-person-card .person-cell {
+  min-width: 0;
+  gap: 8px;
+}
+.calls-person-card .person-cell strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #23415f;
+  font-size: 12px;
+}
+.calls-person-total {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 10px;
+  color: #66788c;
+  font-size: 11px;
+}
+.calls-person-total strong {
+  color: #193955;
+  font-size: 25px;
+  line-height: 1;
+}
+.calls-person-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  margin-top: 8px;
+  color: #66788c;
+  font-size: 10px;
+}
+.calls-person-details span:first-child {
+  padding: 3px 6px;
+  color: #167757;
+  background: #e8f6ef;
+  border-radius: 4px;
+}
+.calls-person-details span:nth-child(2) {
+  padding: 3px 6px;
+  color: #9b6b21;
+  background: #fff5e3;
+  border-radius: 4px;
+}
+.calls-person-details span:last-child {
+  flex-basis: 100%;
+  margin-top: 2px;
+  color: #8392a2;
+}
+.calls-people-summary > .muted {
+  display: block;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
 @media (max-width: 1350px) {
   .main.table-page > .stats-grid.calls-stats {
     display: flex;
