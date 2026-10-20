@@ -5346,3 +5346,18 @@ textarea {
   gap: 10px;
   margin-top: 4px;
 }
+
+@media (max-width: 760px) {
+  .main.table-page:has(.calls-people-summary) {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .main.table-page:has(.calls-people-summary) > .card,
+  .main.table-page:has(.calls-people-summary) > .card > .table-scroll {
+    flex: 0 0 auto;
+  }
+  .main.table-page:has(.calls-people-summary) > .card > .table-scroll {
+    max-height: none;
+  }
+}

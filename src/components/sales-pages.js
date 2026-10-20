@@ -233,6 +233,25 @@ export function LeadsPage({ leads, navigate, openModal, onDialLead, exportData, 
           { key: "created", label: "Date" },
           { key: "date", label: "Follow-up date", render: (r) => r.date || "Not scheduled" },
           { key: "notes", label: "Notes", render: (r) => <TableNotes notes={r.notes} /> },
+          !readOnly && {
+            key: "contact",
+            label: "Contact",
+            render: (r) => (
+              <div className="row-actions">
+                <button
+                  className="lead-action-icon lead-whatsapp-action"
+                  aria-label={`WhatsApp ${r.name}`}
+                  title={whatsappNumberFor(r) ? "Open WhatsApp chat" : "No WhatsApp or phone number"}
+                  disabled={!whatsappNumberFor(r)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    window.open("https://wa.me/" + whatsappNumberFor(r), "_blank", "noopener,noreferrer");
+                  }}
+                ><img src="/images/whatsapp-glyph.svg" width="18" height="18" alt="" aria-hidden="true" /></button>
+                <button className="lead-action-icon" aria-label={`Call ${r.name}`} title="Call & log" onClick={(event) => callLead(event, r)}><Phone size={16} aria-hidden="true" /></button>
+              </div>
+            ),
+          },
           {
             key: "saleAmount",
             label: "Sale amount",
@@ -248,17 +267,6 @@ export function LeadsPage({ leads, navigate, openModal, onDialLead, exportData, 
             label: "Actions",
             render: (r) => (
               <div className="row-actions">
-                {!readOnly && <button className="lead-action-icon" aria-label={`Call ${r.name}`} title="Call & log" onClick={(event) => callLead(event, r)}><Phone size={16} aria-hidden="true" /></button>}
-                {!readOnly && <button
-                  className="lead-action-icon lead-whatsapp-action"
-                  aria-label={`WhatsApp ${r.name}`}
-                  title={whatsappNumberFor(r) ? "Open WhatsApp chat" : "No WhatsApp or phone number"}
-                  disabled={!whatsappNumberFor(r)}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    window.open("https://wa.me/" + whatsappNumberFor(r), "_blank", "noopener,noreferrer");
-                  }}
-                ><img src="/images/whatsapp-glyph.svg" width="18" height="18" alt="" aria-hidden="true" /></button>}
                 {canEditLead(r) && <button className="lead-action-icon" aria-label={`Edit ${r.name}`} title="Edit lead" onClick={(event) => {
                   event.stopPropagation();
                   openModal({ type: "lead", record: r });
