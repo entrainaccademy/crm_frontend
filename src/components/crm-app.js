@@ -85,7 +85,7 @@ import {
   getNoteText,
 } from "@/lib/data";
 import { downloadExport } from "@/lib/export";
-import { api } from "@/lib/api";
+import { api, prepareDialHandoff, restoreDialHandoff, clearDialHandoff } from "@/lib/api";
 const navGroups = [
   ["", [["dashboard", "Dashboard", LayoutDashboard]]],
   [
@@ -843,17 +843,21 @@ export default function CRMApp() {
     [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     if (!authUser?._id) return;
+    const key = `crm-pending-dial:${authUser._id}`;
     try {
-      const stored = sessionStorage.getItem(`crm-pending-dial:${authUser._id}`);
+      const stored = sessionStorage.getItem(key) || localStorage.getItem(key);
       if (!stored) return;
       const attempt = JSON.parse(stored);
       if (attempt?.startedAt && Date.now() - attempt.startedAt < 24 * 60 * 60 * 1000) {
+        sessionStorage.setItem(key, stored);
         setDialAttempt(attempt);
       } else {
-        sessionStorage.removeItem(`crm-pending-dial:${authUser._id}`);
+        sessionStorage.removeItem(key);
+        localStorage.removeItem(key);
       }
     } catch {
-      sessionStorage.removeItem(`crm-pending-dial:${authUser._id}`);
+      sessionStorage.removeItem(key);
+      try { localStorage.removeItem(key); } catch { /* Storage may be unavailable. */ }
     }
   }, [authUser?._id]);
   const notificationButtonRef = useRef(null);
@@ -928,6 +932,7 @@ export default function CRMApp() {
   }, []);
   useEffect(() => {
     async function restoreSession() {
+      restoreDialHandoff();
       if (!sessionStorage.getItem("entrain-token")) { setHydrated(true); return; }
       const user = await api.me();
       if (user) { setAuthUser(user); setRole(user.role); }
@@ -1213,7 +1218,12 @@ export default function CRMApp() {
     }
   }
   function discardDialAttempt() {
-    if (authUser?._id) sessionStorage.removeItem(`crm-pending-dial:${authUser._id}`);
+    if (authUser?._id) {
+      const key = `crm-pending-dial:${authUser._id}`;
+      sessionStorage.removeItem(key);
+      try { localStorage.removeItem(key); } catch { /* Storage may be unavailable. */ }
+    }
+    clearDialHandoff();
     setDialAttempt(null);
   }
 
@@ -1238,7 +1248,11 @@ export default function CRMApp() {
       assigned: userName,
       startedAt: Date.now(),
     };
-    sessionStorage.setItem(`crm-pending-dial:${authUser._id}`, JSON.stringify(attempt));
+    const key = `crm-pending-dial:${authUser._id}`;
+    const storedAttempt = JSON.stringify(attempt);
+    sessionStorage.setItem(key, storedAttempt);
+    try { localStorage.setItem(key, storedAttempt); } catch { /* The current tab still holds the attempt. */ }
+    prepareDialHandoff();
     setDialAttempt(attempt);
     window.location.href = `tel:${phone}`;
   }
@@ -1246,7 +1260,10 @@ export default function CRMApp() {
   function stopDialAttempt(endedAt) {
     if (!dialAttempt || dialAttempt.endedAt || !authUser?._id) return;
     const stopped = { ...dialAttempt, endedAt };
-    sessionStorage.setItem(`crm-pending-dial:${authUser._id}`, JSON.stringify(stopped));
+    const key = `crm-pending-dial:${authUser._id}`;
+    const storedAttempt = JSON.stringify(stopped);
+    sessionStorage.setItem(key, storedAttempt);
+    try { localStorage.setItem(key, storedAttempt); } catch { /* The current tab still holds the attempt. */ }
     setDialAttempt(stopped);
   }
 

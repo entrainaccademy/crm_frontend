@@ -868,6 +868,7 @@ export function CallsPage({
   canWorkRecord = () => true,
 }) {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [todayOnly, setTodayOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [status, setStatus] = useState("");
@@ -924,6 +925,8 @@ export function CallsPage({
   );
   const callsToday = todaysCalls.length;
   const rows = todayOnly ? todaysCalls : filteredCalls;
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
   const answered = rows.filter((c) => c.callStatus === "Answered").length;
   const missed = rows.filter((c) => c.callStatus === "Missed").length;
   const outgoing = rows.filter((c) => c.direction === "Outgoing").length;
@@ -981,7 +984,7 @@ export function CallsPage({
         <div className="table-toolbar">
           <SearchInput
             value={search}
-            onChange={setSearch}
+            onChange={(value) => { setSearch(value); setPage(1); }}
             placeholder="Search calls, numbers, notes…"
           />
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
@@ -992,7 +995,7 @@ export function CallsPage({
               type="button"
               className={`filter-chip${todayOnly ? " active" : ""}`}
               aria-pressed={todayOnly}
-              onClick={() => setTodayOnly((active) => !active)}
+              onClick={() => { setTodayOnly((active) => !active); setPage(1); }}
             >Today</button>
             <span className="muted">{todayOnly ? "Today's call records" : "Call records"}</span>
             {!readOnly && openModal && (
@@ -1007,35 +1010,35 @@ export function CallsPage({
         </div>
         {showFilters && (
           <div className="filter-row">
-            <FilterDropdown value={status} onChange={setStatus}
+            <FilterDropdown value={status} onChange={(value) => { setStatus(value); setPage(1); }}
               options={[...new Set(matchingCalls.map((call) => call.callStatus).filter(Boolean))].sort()}
               label="Call result" allLabel="All results" />
-            <FilterDropdown value={direction} onChange={setDirection}
+            <FilterDropdown value={direction} onChange={(value) => { setDirection(value); setPage(1); }}
               options={[...new Set(matchingCalls.map((call) => call.direction).filter(Boolean))].sort()}
               label="Direction" allLabel="All directions" />
-            <FilterDropdown value={assigned} onChange={setAssigned}
+            <FilterDropdown value={assigned} onChange={(value) => { setAssigned(value); setPage(1); }}
               options={[...new Set(matchingCalls.map((call) => call.assigned || "Unassigned"))].sort()}
               label="Assignee" allLabel="All assignees" />
             <div className="lead-date-range" role="group" aria-label="Call date range">
               <span>Call date</span>
               <label>From
                 <input type="date" aria-label="Call from date" value={dateFrom} max={dateTo || undefined}
-                  onChange={(event) => setDateFrom(event.target.value)} />
+                  onChange={(event) => { setDateFrom(event.target.value); setPage(1); }} />
               </label>
               <label>To
                 <input type="date" aria-label="Call to date" value={dateTo} min={dateFrom || undefined}
-                  onChange={(event) => setDateTo(event.target.value)} />
+                  onChange={(event) => { setDateTo(event.target.value); setPage(1); }} />
               </label>
             </div>
             {(status || direction || assigned || dateFrom || dateTo || todayOnly) && (
               <button type="button" onClick={() => {
-                setStatus(""); setDirection(""); setAssigned(""); setDateFrom(""); setDateTo(""); setTodayOnly(false);
+                setStatus(""); setDirection(""); setAssigned(""); setDateFrom(""); setDateTo(""); setTodayOnly(false); setPage(1);
               }}>Clear filters</button>
             )}
           </div>
         )}
         <DataTable
-          rows={rows}
+          rows={rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)}
           columns={[
             {
               key: "name",
@@ -1195,6 +1198,21 @@ export function CallsPage({
             },
           ].filter(Boolean)}
         />
+        <div className="pagination">
+          <span>
+            Showing {rows.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}–
+            {Math.min(currentPage * PAGE_SIZE, rows.length)} of {rows.length} calls
+          </span>
+          <div>
+            <button type="button" disabled={currentPage === 1} aria-label="Previous page" onClick={() => setPage(currentPage - 1)}>
+              <ChevronLeft size={15} />
+            </button>
+            <span>{currentPage} / {pageCount}</span>
+            <button type="button" disabled={currentPage === pageCount} aria-label="Next page" onClick={() => setPage(currentPage + 1)}>
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
       </section>
     </>
   );

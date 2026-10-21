@@ -2,6 +2,41 @@ const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api
   .trim()
   .replace(/\/+$/, "");
 const API_BASE = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
+const DIAL_HANDOFF_KEY = "entrain-dial-handoff";
+const DIAL_HANDOFF_LIFETIME = 2 * 60 * 60 * 1000;
+
+export function prepareDialHandoff() {
+  const token = sessionStorage.getItem("entrain-token");
+  if (token) {
+    try {
+      localStorage.setItem(DIAL_HANDOFF_KEY, JSON.stringify({ token, expiresAt: Date.now() + DIAL_HANDOFF_LIFETIME }));
+    } catch {
+      // The current tab can still complete the call if persistent storage is unavailable.
+    }
+  }
+}
+
+export function restoreDialHandoff() {
+  if (sessionStorage.getItem("entrain-token")) return;
+  try {
+    const handoff = JSON.parse(localStorage.getItem(DIAL_HANDOFF_KEY) || "null");
+    if (handoff?.token && handoff.expiresAt > Date.now()) {
+      sessionStorage.setItem("entrain-token", handoff.token);
+    }
+  } catch {
+    // A damaged handoff cannot be used to restore the session.
+  } finally {
+    clearDialHandoff();
+  }
+}
+
+export function clearDialHandoff() {
+  try {
+    localStorage.removeItem(DIAL_HANDOFF_KEY);
+  } catch {
+    // Persistent storage may be disabled in the browser.
+  }
+}
 
 async function request(endpoint, options = {}) {
   try {
@@ -19,6 +54,7 @@ async function request(endpoint, options = {}) {
     const json = await res.json();
     if (res.status === 401 && endpoint !== "/auth/login") {
       sessionStorage.removeItem("entrain-token");
+      clearDialHandoff();
       window.dispatchEvent(new Event("entrain-session-expired"));
     }
     return json;
@@ -46,6 +82,7 @@ export const api = {
   },
   logout() {
     sessionStorage.removeItem("entrain-token");
+    clearDialHandoff();
   },
   async getNotifications() {
     const res = await request("/notifications", { cache: "no-store" });
