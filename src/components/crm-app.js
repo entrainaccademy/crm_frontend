@@ -1304,6 +1304,8 @@ export default function CRMApp() {
     setFormSaving(true);
     try {
       await saveFormOnce(form, creationRequestId);
+    } catch (error) {
+      notify(error.message || "Could not save. Please try again.", "error");
     } finally {
       formSavingRef.current = false;
       setFormSaving(false);
@@ -1361,7 +1363,14 @@ export default function CRMApp() {
             { text: `Lead created from Call Log (${callData.callStatus})`, time: "Just now" },
           ],
         };
-        const createdLead = await api.createLead(newLead);
+        let createdLead;
+        try {
+          createdLead = await api.createLead(newLead);
+        } catch (error) {
+          notify(`Call logged. ${error.message}`, "error");
+          setModal(null);
+          return;
+        }
         if (createdLead) {
           setLeads((prev) => prev.some((item) => String(item.id) === String(createdLead.customId ?? createdLead.id))
             ? prev : [normalizeLead(createdLead), ...prev]);

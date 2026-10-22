@@ -137,6 +137,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     });
+    if (res.code === "DUPLICATE_PHONE") {
+      throw new Error(res.message);
+    }
     return res.success ? res.data : null;
   },
   async updateLead(id, data) {
@@ -144,6 +147,9 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(data),
     });
+    if (res.code === "DUPLICATE_PHONE") {
+      throw new Error(res.message);
+    }
     return res.success ? res.data : null;
   },
   async deleteLead(id) {
