@@ -465,6 +465,12 @@ export function FollowupsPage({
   const pageSize = 8;
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(page, pageCount);
+  const visibleRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const assigneeOptions = [
+    ...new Set(followups.map((followup) => followup.assigned).filter(Boolean)),
+    ...(followups.some((followup) => !followup.assigned) ? ["Unassigned"] : []),
+  ].sort((a, b) => a.localeCompare(b));
+  const activeFilterCount = Number(Boolean(assigned)) + Number(Boolean(dateFrom)) + Number(Boolean(dateTo));
   return (
     <section className="card followups-table-card">
       <div className="tabs">
@@ -491,10 +497,7 @@ export function FollowupsPage({
           <FilterDropdown
             value={assigned}
             onChange={(value) => { setAssigned(value); setPage(1); }}
-            options={[
-              ...new Set(followups.map((followup) => followup.assigned).filter(Boolean)),
-              ...(followups.some((followup) => !followup.assigned) ? ["Unassigned"] : []),
-            ].sort((a, b) => a.localeCompare(b))}
+            options={assigneeOptions}
             label="Assignee"
             allLabel="All assignees"
           />
@@ -512,9 +515,31 @@ export function FollowupsPage({
             </label>
           </div>
         </div>
+        <details className="followup-mobile-filters">
+          <summary><SlidersHorizontal size={16} aria-hidden="true" /> Filters{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</summary>
+          <div className="followup-mobile-filter-panel">
+            <label>Assigned to
+              <FilterDropdown value={assigned} onChange={(value) => { setAssigned(value); setPage(1); }}
+                options={assigneeOptions} label="Mobile assignee filter" allLabel="All assignees" />
+            </label>
+            <div className="followup-mobile-date-fields" role="group" aria-label="Follow-up date range">
+              <label>From
+                <input type="date" aria-label="Mobile follow-up from date" value={dateFrom} max={dateTo || undefined}
+                  onChange={(event) => { setDateFrom(event.target.value); setPage(1); }} />
+              </label>
+              <label>To
+                <input type="date" aria-label="Mobile follow-up to date" value={dateTo} min={dateFrom || undefined}
+                  onChange={(event) => { setDateTo(event.target.value); setPage(1); }} />
+              </label>
+            </div>
+            {activeFilterCount > 0 && <button type="button" className="followup-clear-filters" onClick={() => {
+              setAssigned(""); setDateFrom(""); setDateTo(""); setPage(1);
+            }}>Clear filters</button>}
+          </div>
+        </details>
       </div>
       <DataTable
-        rows={rows.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
+        rows={visibleRows}
         onRow={(r) => !readOnly && canWorkRecord(r) ? openModal({ type: "followup", record: r }) : navigate("leads/" + r.leadId)}
         rowClassName={() => "followup-assignee-row"}
         rowStyle={(followup) => {
@@ -611,6 +636,54 @@ export function FollowupsPage({
           },
         ]}
       />
+      <div className="followup-mobile-list">
+        {visibleRows.map((followup) => {
+          const [background, , accent] = assigneeColors.get(followup.assigned) || ["#f8fafc", "#eef2f6", "#aab8c6"];
+          const canWork = !readOnly && canWorkRecord(followup);
+          const cleanPhone = String(followup.phone || "").replace(/[^\d+]/g, "");
+          const dateLabel = followup.date
+            ? new Date(`${followup.date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+            : "No date";
+          return (
+            <details key={followup.id ?? followup._id} className="followup-mobile-item"
+              style={{ "--followup-row-bg": background, "--followup-row-accent": accent }}>
+              <summary>
+                <span className="followup-mobile-primary">
+                  <strong>{followup.name || "Unknown customer"}</strong>
+                  <span>{dateLabel}{followup.time ? ` · ${followup.time}` : ""}</span>
+                </span>
+                <span className="followup-mobile-secondary">
+                  {followup.phone ? <a href={`tel:${cleanPhone}`} onClick={(event) => {
+                    event.stopPropagation();
+                    if (onDialLead) { event.preventDefault(); onDialLead(followup); }
+                  }}>{followup.phone}</a> : <span>No phone</span>}
+                  <span className="followup-assignee"><i aria-hidden="true" />{followup.assigned || "Unassigned"}</span>
+                </span>
+              </summary>
+              <div className="followup-mobile-details">
+                <div><b>Status</b><StatusBadge status={followupStatus(followup)} /></div>
+                {followup.purpose && <div><b>Purpose</b><span>{followup.purpose}</span></div>}
+                {getNoteText(followup.notes) && <div><b>Notes</b><span>{getNoteText(followup.notes)}</span></div>}
+                <div className="followup-mobile-actions">
+                  {followup.phone && <a href={`tel:${cleanPhone}`} onClick={(event) => {
+                    if (onDialLead) { event.preventDefault(); onDialLead(followup); }
+                  }}><Phone size={14} aria-hidden="true" /> Call</a>}
+                  <button type="button" onClick={() => canWork
+                    ? openModal({ type: "followup", record: followup })
+                    : navigate("leads/" + followup.leadId)}>{canWork ? "Edit" : "View lead"}</button>
+                  {canWork && <button type="button" disabled={pendingId === followup.id} onClick={async () => {
+                    setPendingId(followup.id);
+                    try { await onComplete(followup); }
+                    finally { setPendingId(null); }
+                  }}>{followup.completed ? "Reopen" : "Complete"}</button>}
+                  {canWork && <button type="button" className="danger-button" onClick={() => onDelete(followup)}>Delete</button>}
+                </div>
+              </div>
+            </details>
+          );
+        })}
+        {!visibleRows.length && <EmptyState compact />}
+      </div>
       <div className="pagination">
         <span>
           Showing {rows.length ? (currentPage - 1) * pageSize + 1 : 0}–
