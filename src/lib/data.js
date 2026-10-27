@@ -32,6 +32,7 @@ export const statuses = [
   "Follow-up",
   "Qualified",
   "Converted",
+  "Sale",
   "Not Qualified",
   "Lost",
 ];
@@ -46,7 +47,7 @@ export const sources = [
 ];
 
 export const priorities = ["Cool", "Hot", "Cold"];
-export const convertedStatuses = ["Won", "Converted"];
+export const convertedStatuses = ["Won", "Converted", "Sale"];
 export const closedStatuses = [...convertedStatuses, "Not Qualified", "Lost"];
 
 export const normalizeLead = (lead) => {

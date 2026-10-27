@@ -222,12 +222,14 @@ export function DataTable({ columns, rows, onRow, rowClassName, rowStyle }) {
 }
 export function Modal({ title, children, onClose }) {
   const ref = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     const old = document.activeElement;
     const el = ref.current;
     el?.focus();
     const fn = (e) => {
-      if (e.key === "Escape" && !document.querySelector('[data-slot="combobox-content"][data-open]')) onClose();
+      if (e.key === "Escape" && !document.querySelector('[data-slot="combobox-content"][data-open]')) onCloseRef.current();
       if (e.key === "Tab") {
         const list = el.querySelectorAll(
           'button,input,select,textarea,[tabindex="0"]',
@@ -248,7 +250,7 @@ export function Modal({ title, children, onClose }) {
       document.removeEventListener("keydown", fn);
       old?.focus();
     };
-  }, [onClose]);
+  }, []);
   return (
     <div
       className="modal-backdrop"

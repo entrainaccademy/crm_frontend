@@ -717,6 +717,7 @@ const pipelineStageColors = {
   "Follow-up": "#aa8a55",
   Qualified: "#438a91",
   Converted: "#3f9c70",
+  Sale: "#3f9c70",
   "Not Qualified": "#a88676",
   Lost: "#b28282",
 };
