@@ -4117,7 +4117,7 @@ textarea {
   }
 }
 .dashboard-stats {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 @media (max-width: 1000px) {
   .dashboard-stats {
@@ -4133,7 +4133,7 @@ textarea {
   margin-right: auto;
 }
 
-/* Glass treatment is limited to the six Business Overview cards. */
+/* Glass treatment is limited to the dashboard overview cards. */
 .dashboard-stats {
   padding: 0;
   border: 0;
@@ -4207,6 +4207,18 @@ textarea {
     rgba(255, 255, 255, 0.82)
   );
   border-color: #e0dcec;
+}
+.dashboard-stats .stat-card:nth-child(7) {
+  background: linear-gradient(
+    145deg,
+    rgba(225, 243, 234, 0.94),
+    rgba(255, 255, 255, 0.82)
+  );
+  border-color: #d0e8d9;
+  border-top-color: #75b290;
+}
+.dashboard-stats .stat-card:nth-child(7) .stat-label svg {
+  color: #39825e;
 }
 .dashboard-stats .stat-card > strong {
   color: #1c3855;

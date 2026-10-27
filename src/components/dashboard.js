@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Target,
   Trophy,
+  ShoppingBag,
 } from "lucide-react";
 import {
   StatCard,
@@ -233,6 +234,7 @@ export default function Dashboard({
   const callsToday = todaysCalls.length;
   const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status));
   const convertedLeads = wonLeads.length;
+  const salesLeads = leads.filter((lead) => lead.status === "Sale").length;
 
   const totalAchievedSales = wonLeads.reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
   const totalTargetSales = people.reduce((sum, p) => sum + (Number(p.target) || 0), 0);
@@ -247,6 +249,7 @@ export default function Dashboard({
     ["Overdue follow-ups", overdueFollowups, overdueFollowups > 0 ? "Action needed" : "Up to date", Clock, () => navigate?.("follow-ups")],
     ["Calls today", callsToday, callsToday > 0 ? "Logged today" : "None logged", Phone, () => navigate?.("calls")],
     ["Converted leads", convertedLeads, totalLeads > 0 ? `${Math.round((convertedLeads / totalLeads) * 100)}% conv.` : "0%", CheckCircle2, () => navigate?.("pipeline")],
+    ["Sales", salesLeads, salesLeads > 0 ? "Sale status" : "No sales yet", ShoppingBag, () => navigate?.("pipeline")],
   ];
 
   if (role === "HR") {
