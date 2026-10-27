@@ -4786,6 +4786,39 @@ textarea {
   .main:has(.pipeline-workspace) {
     height: calc(100dvh - var(--header));
   }
+  /* Fit the lead date range above the table without hiding pagination. */
+  .leads-table-card > .filter-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: min(30dvh, 250px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .leads-table-card > .filter-row > select {
+    width: 100%;
+    max-width: none;
+  }
+  .leads-table-card .lead-date-range {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 8px;
+    min-width: 0;
+  }
+  .leads-table-card .lead-date-range > span {
+    grid-column: 1 / -1;
+  }
+  .leads-table-card .lead-date-range label {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 0;
+    gap: 2px;
+  }
+  .leads-table-card .lead-date-range input {
+    width: 100%;
+    min-width: 0;
+  }
   .sidebar,
   .is-collapsed .sidebar {
     top: 0;
