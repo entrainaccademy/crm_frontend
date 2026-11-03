@@ -29,23 +29,56 @@ import {
   StatusBadge,
   DataTable,
 } from "./ui";
-import { money, shortMoney, rankExecutives, convertedStatuses, isCallToday } from "@/lib/data";
+import { money, shortMoney, rankExecutives, convertedStatuses } from "@/lib/data";
 import EmptyState from "./empty-state";
 
-export function SalesChart({ period = "This Month", salesTotal, targetTotal, leads = [] }) {
-  const days = ["1", "5", "10", "15", "20", "25", "28", "30"];
-  const currentMonth = new Date().toLocaleString("default", { month: "short" });
-  
-  const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status));
-  const totalSalesVal = salesTotal ?? wonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
-  const totalTargetVal = targetTotal ?? 0;
-
-  const dynamicChartData = days.map((day, i) => {
-    const progress = (i + 1) / days.length;
+const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const recordDate = (value) => {
+  if (!value) return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    if (value.length === 10) return value;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : dateKey(date);
+};
+const callDateKey = (call) => {
+  const raw = call.callDate || call.startedAt || call.createdAt;
+  if (raw === "Today") return dateKey(new Date());
+  return recordDate(raw);
+};
+const periodRange = (period, now, customStart, customEnd) => {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === "This Week") start.setDate(start.getDate() - (start.getDay() + 6) % 7);
+  if (period === "This Month") start.setDate(1);
+  if (period === "Last Month") {
     return {
-      day: `${day} ${currentMonth}`,
-      sales: Number(((totalSalesVal * progress) / 100000).toFixed(1)),
-      target: Number(((totalTargetVal * progress) / 100000).toFixed(1)),
+      start: dateKey(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+      end: dateKey(new Date(now.getFullYear(), now.getMonth(), 0)),
+    };
+  }
+  if (period === "Custom") return { start: customStart, end: customEnd };
+  return { start: dateKey(start), end: dateKey(now) };
+};
+const inRange = (date, range) => Boolean(date && date >= range.start && date <= range.end);
+
+export function SalesChart({ period = "This Month", range = periodRange(period === "Custom" ? "This Month" : period, new Date()), targetTotal, leads = [] }) {
+  const start = new Date(`${range.start}T00:00:00`);
+  const end = new Date(`${range.end}T00:00:00`);
+  const dailySales = new Map();
+  leads.filter((lead) => convertedStatuses.includes(lead.status)).forEach((lead) => {
+    const day = recordDate(lead.convertedAt || lead.updatedAt);
+    if (inRange(day, range)) dailySales.set(day, (dailySales.get(day) || 0) + (Number(lead.saleAmount) || 0));
+  });
+  const totalDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
+  let runningSales = 0;
+  const dynamicChartData = Array.from({ length: totalDays }, (_, index) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + index);
+    runningSales += dailySales.get(dateKey(day)) || 0;
+    return {
+      day: day.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+      sales: runningSales / 100000,
+      target: ((targetTotal || 0) * (index + 1) / totalDays) / 100000,
     };
   });
 
@@ -220,34 +253,44 @@ export default function Dashboard({
   allowedNames,
   navigate,
   period = "This Month",
+  customStart = "",
+  customEnd = "",
 }) {
   const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const todaysCalls = calls.filter((call) =>
-    (!allowedNames || allowedNames.includes(call.assigned)) && isCallToday(call, today)
+  const todayStr = dateKey(today);
+  const range = periodRange(period, today, customStart, customEnd);
+  if (period === "Custom" && (!customStart || !customEnd || customStart > customEnd)) {
+    return <section className="card" style={{ padding: 24 }} role="status">{customStart && customEnd ? "Start date must be on or before end date." : "Choose a start and end date to see dashboard results."}</section>;
+  }
+  const periodLabel = period === "Today" ? "today" : period === "This Week" ? "this week" : period === "This Month" ? "this month" : period === "Last Month" ? "last month" : "in the selected dates";
+  const periodCalls = calls.filter((call) =>
+    (!allowedNames || allowedNames.includes(call.assigned)) && inRange(callDateKey(call), range)
   );
 
-  const totalLeads = leads.length;
-  const leadsAddedToday = leads.filter((lead) => lead.created === todayStr).length;
-  const followupsToday = followups.filter((f) => !f.completed && f.date === todayStr).length;
-  const overdueFollowups = followups.filter((f) => !f.completed && f.date < todayStr).length;
-  const callsToday = todaysCalls.length;
-  const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status));
+  const totalLeads = leads.filter((lead) => !recordDate(lead.createdAt || lead.created) || recordDate(lead.createdAt || lead.created) <= range.end).length;
+  const leadsAddedToday = leads.filter((lead) => inRange(recordDate(lead.createdAt || lead.created), range)).length;
+  const followupsToday = followups.filter((f) => !f.completed && inRange(recordDate(f.date), range)).length;
+  const overdueFollowups = followups.filter((f) => !f.completed && recordDate(f.date) && recordDate(f.date) < range.start).length;
+  const callsToday = periodCalls.length;
+  const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status) && inRange(recordDate(l.convertedAt || l.updatedAt), range));
   const convertedLeads = wonLeads.length;
-  const salesLeads = leads.filter((lead) => lead.status === "Sale").length;
+  const salesLeads = wonLeads.filter((lead) => lead.status === "Sale").length;
 
   const totalAchievedSales = wonLeads.reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
-  const totalTargetSales = people.reduce((sum, p) => sum + (Number(p.target) || 0), 0);
+  const monthlyTargetSales = people.reduce((sum, p) => sum + (Number(p.target) || 0), 0);
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const rangeDays = Math.round((new Date(`${range.end}T00:00:00`) - new Date(`${range.start}T00:00:00`)) / 86400000) + 1;
+  const totalTargetSales = ["This Month", "Last Month"].includes(period) ? monthlyTargetSales : Math.round(monthlyTargetSales * rangeDays / daysInMonth);
   const overallAchievement = Math.round((totalAchievedSales / Math.max(1, totalTargetSales)) * 100);
 
   const leadsTarget = role === "Sales Executive" ? "my-leads" : "leads";
 
   const stats = [
     ["Total leads", totalLeads, totalLeads > 0 ? `${totalLeads} active` : "No leads", Users, () => navigate?.(leadsTarget)],
-    ["Added today", leadsAddedToday, leadsAddedToday > 0 ? `${leadsAddedToday} added` : "None added", UserPlus, () => navigate?.(leadsTarget)],
-    ["Follow-ups today", followupsToday, followupsToday > 0 ? "Due today" : "None due", CalendarClock, () => navigate?.("follow-ups")],
-    ["Overdue follow-ups", overdueFollowups, overdueFollowups > 0 ? "Action needed" : "Up to date", Clock, () => navigate?.("follow-ups")],
-    ["Calls today", callsToday, callsToday > 0 ? "Logged today" : "None logged", Phone, () => navigate?.("calls")],
+    [`Added ${periodLabel}`, leadsAddedToday, leadsAddedToday > 0 ? `${leadsAddedToday} added` : "None added", UserPlus, () => navigate?.(leadsTarget)],
+    [`Follow-ups ${periodLabel}`, followupsToday, followupsToday > 0 ? `Due ${periodLabel}` : "None due", CalendarClock, () => navigate?.("follow-ups")],
+    ["Overdue follow-ups", overdueFollowups, overdueFollowups > 0 ? "Before selected period" : "Up to date", Clock, () => navigate?.("follow-ups")],
+    [`Calls ${periodLabel}`, callsToday, callsToday > 0 ? `Logged ${periodLabel}` : "None logged", Phone, () => navigate?.("calls")],
     ["Converted leads", convertedLeads, totalLeads > 0 ? `${Math.round((convertedLeads / totalLeads) * 100)}% conv.` : "0%", CheckCircle2, () => navigate?.("pipeline")],
     ["Sales", salesLeads, salesLeads > 0 ? "Sale status" : "No sales yet", ShoppingBag, () => navigate?.("pipeline")],
   ];
@@ -382,7 +425,7 @@ export default function Dashboard({
                   <span><i />Target</span>
                 </div>
               </div>
-              <SalesChart period={period} leads={leads} salesTotal={totalAchievedSales} targetTotal={totalTargetSales} />
+              <SalesChart range={range} leads={wonLeads} targetTotal={totalTargetSales} />
               <div className="chart-footer">
                 <span>Target <strong>{money(totalTargetSales)}</strong></span>
                 <span><span className="positive">{overallAchievement}%</span> of target achieved</span>
@@ -395,14 +438,14 @@ export default function Dashboard({
       <section className="card">
         <div className="section-heading">
           <div>
-            <h2>Today's calls</h2>
-            <p className="section-subtitle">Calls logged today</p>
+            <h2>Calls {periodLabel}</h2>
+            <p className="section-subtitle">Calls logged {periodLabel}</p>
           </div>
           <button onClick={() => navigate("calls")}>View all calls <ArrowRight size={14} /></button>
         </div>
-        {todaysCalls.length ? (
+        {periodCalls.length ? (
           <DataTable
-            rows={todaysCalls.slice(0, 5)}
+            rows={periodCalls.slice(0, 5)}
             columns={[
               { key: "name", label: "Customer", render: (call) => call.name || "Unknown caller" },
               { key: "phone", label: "Phone", render: (call) => call.phone || "—" },
@@ -412,7 +455,7 @@ export default function Dashboard({
             ]}
           />
         ) : (
-          <p className="muted" style={{ padding: "20px" }}>No calls logged today.</p>
+          <p className="muted" style={{ padding: "20px" }}>No calls logged {periodLabel}.</p>
         )}
       </section>
     </>

@@ -65,6 +65,8 @@ import {
   TargetsPage,
   StaffPage,
   AnalyticsPage,
+  reportRange,
+  reportInRange,
   UsersPage,
   SettingsPage,
   TasksPage,
@@ -837,6 +839,8 @@ export default function CRMApp() {
     [dropdown, setDropdown] = useState(""),
     [search, setSearch] = useState(""),
     [period, setPeriod] = useState("Today"),
+    [dashboardCustomStart, setDashboardCustomStart] = useState(""),
+    [dashboardCustomEnd, setDashboardCustomEnd] = useState(""),
     [modal, setModal] = useState(null),
     [toast, setToast] = useState(null),
     [userNotifications, setUserNotifications] = useState([]),
@@ -1111,11 +1115,20 @@ export default function CRMApp() {
   const scopedFollowups = followups.filter(
     (l) => !scopedNames || scopedNames.includes(l.assigned),
   );
-  const reportRows = page === "sales-reports"
+  const selectedReportRange = reportRange(period, dashboardCustomStart, dashboardCustomEnd);
+  const hasReportRange = period !== "Custom" || Boolean(dashboardCustomStart && dashboardCustomEnd && dashboardCustomStart <= dashboardCustomEnd);
+  const unfilteredReportRows = page === "sales-reports"
     ? scopedLeads.filter((lead) => convertedStatuses.includes(lead.status))
     : page === "lead-reports" ? scopedLeads
       : page === "call-reports" ? callsState.filter((call) => !scopedNames || scopedNames.includes(call.assigned))
         : page === "follow-up-reports" ? scopedFollowups : [];
+  const reportRows = hasReportRange ? unfilteredReportRows.filter((record) => {
+    const date = page === "sales-reports" ? record.convertedAt || record.updatedAt
+      : page === "lead-reports" ? record.createdAt || record.created
+        : page === "call-reports" ? record.callDate === "Today" ? new Date() : record.callDate || record.startedAt || record.createdAt
+          : record.date;
+    return reportInRange(date, selectedReportRange);
+  }) : [];
   const allowed =
     access[role].includes(page) ||
     (page === "leads" && detailId && role === "Sales Executive");
@@ -1941,7 +1954,7 @@ export default function CRMApp() {
               <div
                 className={`period-row ${page === "dashboard" ? "dashboard-period-row" : ""}`}
               >
-                <DateRangeFilter value={period} onChange={setPeriod} />
+                <DateRangeFilter value={period} onChange={setPeriod} includeLastMonth customStart={dashboardCustomStart} customEnd={dashboardCustomEnd} onCustomStartChange={setDashboardCustomStart} onCustomEndChange={setDashboardCustomEnd} />
               </div>
             )}
             {page === "dashboard" && (
@@ -1960,6 +1973,8 @@ export default function CRMApp() {
                 allowedNames={scopedNames}
                 navigate={navigate}
                 period={period}
+                customStart={dashboardCustomStart}
+                customEnd={dashboardCustomEnd}
               />
             )}
             {["leads", "my-leads"].includes(page) && leadsError && scopedLeads.length === 0 ? (
@@ -2081,6 +2096,10 @@ export default function CRMApp() {
                 period={period}
                 onPeriodChange={setPeriod}
                 exportData={exportData}
+                customStart={dashboardCustomStart}
+                customEnd={dashboardCustomEnd}
+                onCustomStartChange={setDashboardCustomStart}
+                onCustomEndChange={setDashboardCustomEnd}
               />
             )}
             {page === "users" && (

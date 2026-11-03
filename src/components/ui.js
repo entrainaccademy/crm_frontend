@@ -126,8 +126,8 @@ export function FilterDropdown({ value, onChange, options, label, allLabel = lab
     </select>
   );
 }
-export function DateRangeFilter({ value = "This Month", onChange }) {
-  const options = ["Today", "This Week", "This Month", "Custom"];
+export function DateRangeFilter({ value = "This Month", onChange, customStart = "", customEnd = "", onCustomStartChange, onCustomEndChange, includeLastMonth = false }) {
+  const options = ["Today", "This Week", "This Month", ...(includeLastMonth ? ["Last Month"] : []), "Custom"];
   return (
     <div className="date-filter">
       <div className="filter-chips-bar" role="tablist" aria-label="Filter period">
@@ -146,9 +146,9 @@ export function DateRangeFilter({ value = "This Month", onChange }) {
       </div>
       {value === "Custom" && (
         <div className="custom-dates">
-          <input aria-label="Start date" type="date" />
+          <input aria-label="Start date" type="date" value={customStart} onChange={(event) => onCustomStartChange?.(event.target.value)} />
           <span>to</span>
-          <input aria-label="End date" type="date" />
+          <input aria-label="End date" type="date" value={customEnd} onChange={(event) => onCustomEndChange?.(event.target.value)} />
         </div>
       )}
     </div>
