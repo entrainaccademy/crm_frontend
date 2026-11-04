@@ -48,6 +48,17 @@ export const sources = [
 
 export const priorities = ["Cool", "Hot", "Cold"];
 export const convertedStatuses = ["Won", "Converted", "Sale"];
+export const saleDate = (lead) => {
+  if (lead?.saleAt) return lead.saleAt;
+  const activity = lead?.activities?.find((entry) =>
+    entry.type === "status_change" && / to Sale$/.test(entry.text || "")
+  );
+  if (activity?.time) {
+    const date = new Date(activity.time);
+    if (!Number.isNaN(date.getTime())) return date.toISOString();
+  }
+  return lead?.status === "Sale" ? lead.convertedAt || lead.updatedAt : null;
+};
 export const closedStatuses = [...convertedStatuses, "Not Qualified", "Lost"];
 
 export const normalizeLead = (lead) => {

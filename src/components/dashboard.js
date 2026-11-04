@@ -29,7 +29,7 @@ import {
   StatusBadge,
   DataTable,
 } from "./ui";
-import { money, shortMoney, rankExecutives, convertedStatuses } from "@/lib/data";
+import { money, shortMoney, rankExecutives, convertedStatuses, saleDate } from "@/lib/data";
 import EmptyState from "./empty-state";
 
 const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -66,7 +66,7 @@ export function SalesChart({ period = "This Month", range = periodRange(period =
   const end = new Date(`${range.end}T00:00:00`);
   const dailySales = new Map();
   leads.filter((lead) => convertedStatuses.includes(lead.status)).forEach((lead) => {
-    const day = recordDate(lead.convertedAt || lead.updatedAt);
+    const day = recordDate(saleDate(lead));
     if (inRange(day, range)) dailySales.set(day, (dailySales.get(day) || 0) + (Number(lead.saleAmount) || 0));
   });
   const totalDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
@@ -273,10 +273,11 @@ export default function Dashboard({
   const overdueFollowups = followups.filter((f) => !f.completed && recordDate(f.date) && recordDate(f.date) < range.start).length;
   const callsToday = periodCalls.length;
   const wonLeads = leads.filter((l) => convertedStatuses.includes(l.status) && inRange(recordDate(l.convertedAt || l.updatedAt), range));
+  const periodSales = leads.filter((lead) => lead.status === "Sale" && inRange(recordDate(saleDate(lead)), range));
   const convertedLeads = wonLeads.length;
-  const salesLeads = wonLeads.filter((lead) => lead.status === "Sale").length;
+  const salesLeads = periodSales.length;
 
-  const totalAchievedSales = wonLeads.reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
+  const totalAchievedSales = periodSales.reduce((sum, l) => sum + (Number(l.saleAmount) || 0), 0);
   const monthlyTargetSales = people.reduce((sum, p) => sum + (Number(p.target) || 0), 0);
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   const rangeDays = Math.round((new Date(`${range.end}T00:00:00`) - new Date(`${range.start}T00:00:00`)) / 86400000) + 1;
@@ -365,8 +366,8 @@ export default function Dashboard({
         ...ownAccount,
         sales: leads.filter((lead) =>
           lead.assigned === viewerName &&
-          convertedStatuses.includes(lead.status) &&
-          String(lead.convertedAt || lead.updatedAt || "").slice(0, 7) === todayStr.slice(0, 7)
+          lead.status === "Sale" &&
+          String(saleDate(lead) || "").slice(0, 7) === todayStr.slice(0, 7)
         ).reduce((sum, lead) => sum + (Number(lead.saleAmount) || 0), 0),
       })
     : people.find((person) => person.role === "Sales Executive") || people[0];
@@ -425,7 +426,7 @@ export default function Dashboard({
                   <span><i />Target</span>
                 </div>
               </div>
-              <SalesChart range={range} leads={wonLeads} targetTotal={totalTargetSales} />
+              <SalesChart range={range} leads={periodSales} targetTotal={totalTargetSales} />
               <div className="chart-footer">
                 <span>Target <strong>{money(totalTargetSales)}</strong></span>
                 <span><span className="positive">{overallAchievement}%</span> of target achieved</span>

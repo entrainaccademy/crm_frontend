@@ -78,6 +78,7 @@ import {
   initialFollowups,
   statuses,
   convertedStatuses,
+  saleDate,
   sources,
   priorities,
   money,
@@ -1009,8 +1010,8 @@ export default function CRMApp() {
           const endTime = new Date(`${dateKey(monthEnd)}T23:59:59.999Z`).getTime();
           const fallback = eligibleUsers.map((user) => {
             const converted = leadsData.filter((lead) => {
-              if (lead.assigned !== user.name || !convertedStatuses.includes(lead.status)) return false;
-              const conversionTime = new Date(lead.convertedAt || lead.updatedAt).getTime();
+              if (lead.assigned !== user.name || lead.status !== "Sale") return false;
+              const conversionTime = new Date(saleDate(lead)).getTime();
               return conversionTime >= startTime && conversionTime <= endTime;
             });
             return {
@@ -1118,12 +1119,12 @@ export default function CRMApp() {
   const selectedReportRange = reportRange(period, dashboardCustomStart, dashboardCustomEnd);
   const hasReportRange = period !== "Custom" || Boolean(dashboardCustomStart && dashboardCustomEnd && dashboardCustomStart <= dashboardCustomEnd);
   const unfilteredReportRows = page === "sales-reports"
-    ? scopedLeads.filter((lead) => convertedStatuses.includes(lead.status))
+    ? scopedLeads.filter((lead) => lead.status === "Sale")
     : page === "lead-reports" ? scopedLeads
       : page === "call-reports" ? callsState.filter((call) => !scopedNames || scopedNames.includes(call.assigned))
         : page === "follow-up-reports" ? scopedFollowups : [];
   const reportRows = hasReportRange ? unfilteredReportRows.filter((record) => {
-    const date = page === "sales-reports" ? record.convertedAt || record.updatedAt
+    const date = page === "sales-reports" ? saleDate(record)
       : page === "lead-reports" ? record.createdAt || record.created
         : page === "call-reports" ? record.callDate === "Today" ? new Date() : record.callDate || record.startedAt || record.createdAt
           : record.date;

@@ -26,7 +26,7 @@ import {
   LoadingSkeleton,
   ExportMenu,
 } from "./ui";
-import { rankExecutives, money, roles, access, sources, statuses, priorities, convertedStatuses, closedStatuses } from "@/lib/data";
+import { rankExecutives, money, roles, access, sources, statuses, priorities, convertedStatuses, closedStatuses, saleDate } from "@/lib/data";
 import { SalesChart } from "./dashboard";
 
 const reportDateKey = (value) => {
@@ -488,6 +488,7 @@ export function AnalyticsPage({
   const validRange = period !== "Custom" || Boolean(customStart && customEnd && customStart <= customEnd);
   const periodLeads = validRange ? leads.filter((lead) => reportInRange(lead.createdAt || lead.created, range)) : [];
   const periodConversions = validRange ? leads.filter((lead) => convertedStatuses.includes(lead.status) && reportInRange(lead.convertedAt || lead.updatedAt, range)) : [];
+  const periodSales = validRange ? leads.filter((lead) => lead.status === "Sale" && reportInRange(saleDate(lead), range)) : [];
   const periodCalls = validRange ? calls.filter((call) => reportInRange(call.callDate === "Today" ? new Date() : call.callDate || call.startedAt || call.createdAt, range)) : [];
   const periodFollowups = validRange ? followups.filter((followup) => reportInRange(followup.date, range)) : [];
   const daysInMonth = new Date(new Date(`${range.end || reportDateKey(new Date())}T00:00:00`).getFullYear(), new Date(`${range.end || reportDateKey(new Date())}T00:00:00`).getMonth() + 1, 0).getDate();
@@ -505,22 +506,23 @@ export function AnalyticsPage({
     page === "performance" ? (executive ? [executive] : []) : people;
   const exportPeople = visiblePeople.map((person) => {
     const converted = periodConversions.filter((lead) => lead.assigned === person.name);
+    const sales = periodSales.filter((lead) => lead.assigned === person.name);
     return {
       ...person,
-      sales: converted.reduce((total, lead) => total + (Number(lead.saleAmount) || 0), 0),
+      sales: sales.reduce((total, lead) => total + (Number(lead.saleAmount) || 0), 0),
       conversions: converted.length,
       periodTarget: targetForPerson(person),
     };
   });
 
   const wonLeads = periodConversions;
-  const totalSales = wonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
+  const totalSales = periodSales.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
   const totalTarget = people.reduce((s, p) => s + targetForPerson(p), 0);
   const achievementPct = `${Math.round((totalSales / Math.max(1, totalTarget)) * 100)}%`;
   const conversionRate = periodLeads.length > 0 ? `${((periodLeads.filter((lead) => convertedStatuses.includes(lead.status)).length / periodLeads.length) * 100).toFixed(1)}%` : "0%";
 
   const execWonLeads = executive ? periodConversions.filter((l) => l.assigned === executive.name) : [];
-  const execSales = execWonLeads.reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
+  const execSales = periodSales.filter((lead) => lead.assigned === executive?.name).reduce((s, l) => s + (Number(l.saleAmount) || 0), 0);
   const execTarget = targetForPerson(executive);
 
   const answeredCalls = periodCalls.filter((c) => c.callStatus === "Answered").length;
@@ -615,7 +617,7 @@ export function AnalyticsPage({
           ) : (
             <SalesChart
               period={period}
-              leads={page === "performance" ? execWonLeads : periodConversions}
+              leads={page === "performance" ? periodSales.filter((lead) => lead.assigned === executive?.name) : periodSales}
               range={range}
               salesTotal={page === "performance" ? execSales : totalSales}
               targetTotal={page === "performance" ? execTarget : totalTarget}
