@@ -200,25 +200,42 @@ export function LeadsPage({ leads, navigate, openModal, onDialLead, exportData, 
             key: "phone",
             label: "Phone",
             render: (r) => {
-              if (!r.phone) return "—";
-              const cleanPhone = String(r.phone).replace(/[^\d+]/g, "");
+              const cleanPhone = String(r.phone || "").replace(/[^\d+]/g, "");
+              const whatsappNumber = whatsappNumberFor(r);
               return (
-                <a
-                  className="lead-phone-call"
-                  href={`tel:${cleanPhone}`}
-                  title={`Call ${r.phone} in mobile dialer`}
-                  aria-label={`Call ${r.name || r.phone}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    if (onDialLead) {
-                      event.preventDefault();
-                      onDialLead(r);
-                    }
-                  }}
-                >
-                  <Phone size={14} aria-hidden="true" />
-                  <span>{r.phone}</span>
-                </a>
+                <div className="lead-phone-cell">
+                  {r.phone ? (
+                    <a
+                      className="lead-phone-call"
+                      href={`tel:${cleanPhone}`}
+                      title={`Call ${r.phone} in mobile dialer`}
+                      aria-label={`Call ${r.name || r.phone}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (onDialLead) {
+                          event.preventDefault();
+                          onDialLead(r);
+                        }
+                      }}
+                    >
+                      <Phone size={14} aria-hidden="true" />
+                      <span>{r.phone}</span>
+                    </a>
+                  ) : "—"}
+                  {!readOnly && whatsappNumber && (
+                    <button
+                      className="lead-phone-whatsapp"
+                      aria-label={`WhatsApp ${r.name}`}
+                      title="Open WhatsApp chat"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        window.open("https://wa.me/" + whatsappNumber, "_blank", "noopener,noreferrer");
+                      }}
+                    >
+                      <img src="/images/whatsapp-glyph.svg" width="18" height="18" alt="" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
               );
             },
           },
@@ -238,16 +255,6 @@ export function LeadsPage({ leads, navigate, openModal, onDialLead, exportData, 
             label: "Contact",
             render: (r) => (
               <div className="row-actions">
-                <button
-                  className="lead-action-icon lead-whatsapp-action"
-                  aria-label={`WhatsApp ${r.name}`}
-                  title={whatsappNumberFor(r) ? "Open WhatsApp chat" : "No WhatsApp or phone number"}
-                  disabled={!whatsappNumberFor(r)}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    window.open("https://wa.me/" + whatsappNumberFor(r), "_blank", "noopener,noreferrer");
-                  }}
-                ><img src="/images/whatsapp-glyph.svg" width="18" height="18" alt="" aria-hidden="true" /></button>
                 <button className="lead-action-icon" aria-label={`Call ${r.name}`} title="Call & log" onClick={(event) => callLead(event, r)}><Phone size={16} aria-hidden="true" /></button>
               </div>
             ),

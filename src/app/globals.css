@@ -1333,6 +1333,27 @@ td small {
 .lead-phone-call:active {
   transform: scale(0.97);
 }
+.lead-phone-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.lead-phone-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+.lead-phone-whatsapp:hover {
+  background: #e9f7ee;
+}
 .danger-button {
   border-color: #ebc8c8;
   color: #a33d3d;
