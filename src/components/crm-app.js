@@ -2021,6 +2021,7 @@ export default function CRMApp() {
             {page === "follow-ups" && (
               <FollowupsPage
                 followups={scopedFollowups}
+                leads={scopedLeads}
                 onDialLead={(record) => startDialLead(scopedLeads.find((lead) => String(lead.customId ?? lead.id) === String(record.leadId)) || { name: record.name, phone: record.phone, service: record.service })}
                 onComplete={completeFollowup}
                 onDelete={(followup) => setModal({ type: "delete-followup", record: followup })}

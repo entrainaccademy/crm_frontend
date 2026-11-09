@@ -5620,6 +5620,10 @@ textarea {
     min-width: 53px;
     color: #61758a;
   }
+  .followup-mobile-note {
+    min-width: 0;
+    white-space: pre-wrap;
+  }
   .followup-mobile-actions {
     display: flex;
     flex-wrap: wrap;

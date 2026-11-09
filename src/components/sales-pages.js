@@ -427,6 +427,7 @@ export function LeadDetails({ lead, openModal, onDialLead, notify, updateLead, n
 }
 export function FollowupsPage({
   followups = [],
+  leads = [],
   onComplete,
   onDelete,
   openModal,
@@ -446,6 +447,11 @@ export function FollowupsPage({
   const todayStr = new Date().toISOString().split("T")[0];
   const followupStatus = (followup) =>
     followup.completed ? "Completed" : followup.date && followup.date < todayStr ? "Overdue" : "Scheduled";
+  const leadNotes = new Map(leads.map((lead) => [
+    String(lead.customId ?? lead.id),
+    getNoteText([...(lead.notes || [])].reverse().find((note) => getNoteText(note))),
+  ]));
+  const leadNoteFor = (followup) => leadNotes.get(String(followup.leadId)) || "";
   const query = search.trim().toLowerCase();
   const rows = followups.filter((f) =>
     (tab === "All"
@@ -458,7 +464,7 @@ export function FollowupsPage({
             : tab === "Upcoming"
               ? f.date > todayStr
               : f.date < todayStr)) &&
-    (!query || [f.name, f.phone, f.purpose, getNoteText(f.notes)]
+    (!query || [f.name, f.phone, f.purpose, getNoteText(f.notes), leadNoteFor(f)]
       .some((value) => String(value || "").toLowerCase().includes(query))) &&
     (!assigned || (assigned === "Unassigned" ? !f.assigned : f.assigned === assigned)) &&
     (!dateFrom || (f.date && f.date >= dateFrom)) &&
@@ -648,9 +654,12 @@ export function FollowupsPage({
           const [background, , accent] = assigneeColors.get(followup.assigned) || ["#f8fafc", "#eef2f6", "#aab8c6"];
           const canWork = !readOnly && canWorkRecord(followup);
           const cleanPhone = String(followup.phone || "").replace(/[^\d+]/g, "");
+          const whatsappNumber = whatsappNumberFor(followup);
           const dateLabel = followup.date
             ? new Date(`${followup.date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
             : "No date";
+          const followupNote = getNoteText(followup.notes);
+          const leadNote = leadNoteFor(followup);
           return (
             <details key={followup.id ?? followup._id} className="followup-mobile-item"
               style={{ "--followup-row-bg": background, "--followup-row-accent": accent }}>
@@ -669,12 +678,14 @@ export function FollowupsPage({
               </summary>
               <div className="followup-mobile-details">
                 <div><b>Status</b><StatusBadge status={followupStatus(followup)} /></div>
-                {followup.purpose && <div><b>Purpose</b><span>{followup.purpose}</span></div>}
-                {getNoteText(followup.notes) && <div><b>Notes</b><span>{getNoteText(followup.notes)}</span></div>}
+                <div><b>Notes</b><span className={followupNote || leadNote ? "followup-mobile-note" : "muted"}>{followupNote || leadNote || "No note yet"}</span></div>
                 <div className="followup-mobile-actions">
                   {followup.phone && <a href={`tel:${cleanPhone}`} onClick={(event) => {
                     if (onDialLead) { event.preventDefault(); onDialLead(followup); }
                   }}><Phone size={14} aria-hidden="true" /> Call</a>}
+                  {whatsappNumber && <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${followup.name || followup.phone || "customer"}`}>
+                    <img src="/images/whatsapp-glyph.svg" width="15" height="15" alt="" aria-hidden="true" /> WhatsApp
+                  </a>}
                   <button type="button" onClick={() => canWork
                     ? openModal({ type: "followup", record: followup })
                     : navigate("leads/" + followup.leadId)}>{canWork ? "Edit" : "View lead"}</button>
