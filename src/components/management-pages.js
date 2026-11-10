@@ -491,10 +491,7 @@ export function AnalyticsPage({
   const periodSales = validRange ? leads.filter((lead) => lead.status === "Sale" && reportInRange(saleDate(lead), range)) : [];
   const periodCalls = validRange ? calls.filter((call) => reportInRange(call.callDate === "Today" ? new Date() : call.callDate || call.startedAt || call.createdAt, range)) : [];
   const periodFollowups = validRange ? followups.filter((followup) => reportInRange(followup.date, range)) : [];
-  const daysInMonth = new Date(new Date(`${range.end || reportDateKey(new Date())}T00:00:00`).getFullYear(), new Date(`${range.end || reportDateKey(new Date())}T00:00:00`).getMonth() + 1, 0).getDate();
-  const rangeDays = validRange ? Math.max(1, Math.round((new Date(`${range.end}T00:00:00`) - new Date(`${range.start}T00:00:00`)) / 86400000) + 1) : 0;
-  const targetFactor = ["This Month", "Last Month"].includes(period) ? 1 : rangeDays / daysInMonth;
-  const targetForPerson = (person) => Math.round((Number(person?.target) || 0) * targetFactor);
+  const targetForPerson = (person) => Number(person?.target) || 0;
   const isSales = page === "performance" || page === "sales-reports";
   const executiveName = people.some(
     (person) => person.name === selectedExecutive,
@@ -511,7 +508,7 @@ export function AnalyticsPage({
       ...person,
       sales: sales.reduce((total, lead) => total + (Number(lead.saleAmount) || 0), 0),
       conversions: converted.length,
-      periodTarget: targetForPerson(person),
+      monthlyTarget: targetForPerson(person),
     };
   });
 
@@ -554,9 +551,9 @@ export function AnalyticsPage({
         {(page === "performance"
           ? [
               ["Sales achieved", money(execSales)],
-              ["Individual target", money(execTarget)],
+              ["Monthly target", money(execTarget)],
               [
-                "Target achievement",
+                "Monthly target achievement",
                 `${Math.round((execSales / Math.max(1, execTarget)) * 100)}%`,
               ],
               ["Conversions", execWonLeads.length || executive?.conversions || 0],
@@ -564,8 +561,8 @@ export function AnalyticsPage({
           : isSales
             ? [
                 ["Total sales", money(totalSales)],
-                ["Period target", money(totalTarget)],
-                ["Target achievement", achievementPct],
+                ["Monthly target", money(totalTarget)],
+                ["Monthly target achievement", achievementPct],
                 ["Conversion rate", conversionRate],
               ]
             : page === "lead-reports"
@@ -680,13 +677,13 @@ export function AnalyticsPage({
                 return money(won);
               },
             },
-            { key: "target", label: "Target", render: (r) => money(r.periodTarget) },
+            { key: "target", label: "Monthly target", render: (r) => money(r.monthlyTarget) },
             {
               key: "achievement",
-              label: "Achievement",
+              label: "Monthly target achievement",
               render: (r) => {
                 const won = r.sales || 0;
-                return ((won / Math.max(1, r.periodTarget)) * 100).toFixed(1) + "%";
+                return ((won / Math.max(1, r.monthlyTarget)) * 100).toFixed(1) + "%";
               },
             },
             {
