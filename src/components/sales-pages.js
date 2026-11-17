@@ -50,7 +50,8 @@ const PAGE_SIZE = 10;
 function callDateKey(call) {
   const label = String(call.callDate || "").trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(label)) return label;
-  const date = label === "Today" ? new Date() : new Date(label || call.startedAt || call.createdAt || "");
+  const date = label === "Today" || label === "Yesterday" ? new Date() : new Date(label || call.startedAt || call.createdAt || "");
+  if (label === "Yesterday") date.setDate(date.getDate() - 1);
   if (Number.isNaN(date.getTime())) return "";
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -961,7 +962,7 @@ export function CallsPage({
 }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [todayOnly, setTodayOnly] = useState(false);
+  const [datePreset, setDatePreset] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [status, setStatus] = useState("");
   const [direction, setDirection] = useState("");
@@ -976,10 +977,14 @@ export function CallsPage({
         .includes(search.toLowerCase()),
   );
 
+  const presetDate = new Date();
+  if (datePreset === "yesterday") presetDate.setDate(presetDate.getDate() - 1);
+  const presetDateKey = `${presetDate.getFullYear()}-${String(presetDate.getMonth() + 1).padStart(2, "0")}-${String(presetDate.getDate()).padStart(2, "0")}`;
   const filteredCalls = matchingCalls.filter((call) =>
     (!status || call.callStatus === status) &&
     (!direction || call.direction === direction) &&
     (!assigned || (assigned === "Unassigned" ? !call.assigned || call.assigned === "Unassigned" : call.assigned === assigned)) &&
+    (!datePreset || callDateKey(call) === presetDateKey) &&
     (!dateFrom || callDateKey(call) >= dateFrom) &&
     (!dateTo || (callDateKey(call) && callDateKey(call) <= dateTo)),
   );
@@ -1016,7 +1021,7 @@ export function CallsPage({
     b.total - a.total || a.name.localeCompare(b.name)
   );
   const callsToday = todaysCalls.length;
-  const rows = todayOnly ? todaysCalls : filteredCalls;
+  const rows = filteredCalls;
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const answered = rows.filter((c) => c.callStatus === "Answered").length;
@@ -1030,6 +1035,7 @@ export function CallsPage({
   }, 0);
   const averageSeconds = rows.length ? Math.round(totalSeconds / rows.length) : 0;
   const averageDuration = `${String(Math.floor(averageSeconds / 60)).padStart(2, "0")}:${String(averageSeconds % 60).padStart(2, "0")}`;
+  const totalDuration = `${String(Math.floor(totalSeconds / 3600)).padStart(2, "0")}:${String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0")}:${String(totalSeconds % 60).padStart(2, "0")}`;
 
   return (
     <>
@@ -1041,6 +1047,7 @@ export function CallsPage({
           ["Missed calls", missed],
           ["Outgoing calls", outgoing],
           ["Recorded calls", recorded],
+          ["Total call duration", totalDuration],
           ["Average duration", averageDuration],
         ].map(([label, value]) => (
           <StatCard key={label} label={label} value={value} icon={Phone} />
@@ -1083,13 +1090,19 @@ export function CallsPage({
             <button type="button" aria-expanded={showFilters} onClick={() => setShowFilters((open) => !open)}>
               <SlidersHorizontal size={15} /> Filters
             </button>
-            <button
-              type="button"
-              className={`filter-chip${todayOnly ? " active" : ""}`}
-              aria-pressed={todayOnly}
-              onClick={() => { setTodayOnly((active) => !active); setPage(1); }}
-            >Today</button>
-            <span className="muted">{todayOnly ? "Today's call records" : "Call records"}</span>
+            {["today", "yesterday"].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`filter-chip${datePreset === preset ? " active" : ""}`}
+                aria-pressed={datePreset === preset}
+                onClick={() => {
+                  setDatePreset(datePreset === preset ? "" : preset);
+                  setDateFrom(""); setDateTo(""); setPage(1);
+                }}
+              >{preset === "today" ? "Today" : "Yesterday"}</button>
+            ))}
+            <span className="muted">{datePreset ? `${datePreset === "today" ? "Today's" : "Yesterday's"} call records` : "Call records"}</span>
             {!readOnly && openModal && (
               <button
                 className="primary"
@@ -1115,16 +1128,16 @@ export function CallsPage({
               <span>Call date</span>
               <label>From
                 <input type="date" aria-label="Call from date" value={dateFrom} max={dateTo || undefined}
-                  onChange={(event) => { setDateFrom(event.target.value); setPage(1); }} />
+                  onChange={(event) => { setDateFrom(event.target.value); setDatePreset(""); setPage(1); }} />
               </label>
               <label>To
                 <input type="date" aria-label="Call to date" value={dateTo} min={dateFrom || undefined}
-                  onChange={(event) => { setDateTo(event.target.value); setPage(1); }} />
+                  onChange={(event) => { setDateTo(event.target.value); setDatePreset(""); setPage(1); }} />
               </label>
             </div>
-            {(status || direction || assigned || dateFrom || dateTo || todayOnly) && (
+            {(status || direction || assigned || dateFrom || dateTo || datePreset) && (
               <button type="button" onClick={() => {
-                setStatus(""); setDirection(""); setAssigned(""); setDateFrom(""); setDateTo(""); setTodayOnly(false); setPage(1);
+                setStatus(""); setDirection(""); setAssigned(""); setDateFrom(""); setDateTo(""); setDatePreset(""); setPage(1);
               }}>Clear filters</button>
             )}
           </div>
