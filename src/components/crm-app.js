@@ -1180,6 +1180,29 @@ export default function CRMApp() {
     await refreshLeadSchedule(saved.leadId);
     notify(saved.completed ? "Follow-up completed" : "Follow-up reopened");
   };
+  const setFollowupOutcome = async (followup, outcome) => {
+    if (readOnly || !canWorkRecord(followup) || !["Lost", "Converted"].includes(outcome)) return;
+    const lead = scopedLeads.find((item) => String(item.customId ?? item.id) === String(followup.leadId));
+    if (!lead || !canEditLead(lead)) { notify("Linked lead is unavailable for this follow-up.", "error"); return; }
+    const savedFollowup = await api.updateFollowup(followup._id || followup.id, {
+      status: outcome, completed: true, completedAt: new Date().toISOString(),
+    });
+    if (!savedFollowup) { notify("Could not update follow-up. Please try again.", "error"); return; }
+    const savedLead = await api.updateLead(lead.id, { status: outcome });
+    if (!savedLead) {
+      await api.updateFollowup(followup._id || followup.id, {
+        status: followup.status || "Follow-up", completed: followup.completed,
+        completedAt: followup.completedAt || null,
+      });
+      notify("Could not update lead. Please try again.", "error");
+      return;
+    }
+    setFollowups((prev) => prev.map((item) => item.id === followup.id ? normalizeFollowup(savedFollowup) : item));
+    setLeads((prev) => prev.map((item) => item.id === lead.id ? normalizeLead(savedLead) : item));
+    await refreshLeadSchedule(savedFollowup.leadId);
+    await refreshLeaderboard();
+    notify(`Follow-up marked ${outcome.toLowerCase()}`);
+  };
   const deleteFollowup = async (followup) => {
     if (readOnly || !canWorkRecord(followup)) return;
     const deleted = await api.deleteFollowup(followup._id || followup.id);
@@ -2024,6 +2047,7 @@ export default function CRMApp() {
                 leads={scopedLeads}
                 onDialLead={(record) => startDialLead(scopedLeads.find((lead) => String(lead.customId ?? lead.id) === String(record.leadId)) || { name: record.name, phone: record.phone, service: record.service })}
                 onComplete={completeFollowup}
+                onOutcome={setFollowupOutcome}
                 onDelete={(followup) => setModal({ type: "delete-followup", record: followup })}
                 openModal={setModal}
                 navigate={navigate}

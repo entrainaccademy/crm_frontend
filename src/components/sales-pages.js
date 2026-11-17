@@ -430,6 +430,7 @@ export function FollowupsPage({
   followups = [],
   leads = [],
   onComplete,
+  onOutcome,
   onDelete,
   openModal,
   onDialLead,
@@ -445,8 +446,10 @@ export function FollowupsPage({
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [pendingId, setPendingId] = useState(null);
-  const todayStr = new Date().toISOString().split("T")[0];
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const followupStatus = (followup) =>
+    ["Lost", "Converted"].includes(followup.status) ? followup.status :
     followup.completed ? "Completed" : followup.date && followup.date < todayStr ? "Overdue" : "Scheduled";
   const leadNotes = new Map(leads.map((lead) => [
     String(lead.customId ?? lead.id),
@@ -454,17 +457,18 @@ export function FollowupsPage({
   ]));
   const leadNoteFor = (followup) => leadNotes.get(String(followup.leadId)) || "";
   const query = search.trim().toLowerCase();
+  const counts = Object.fromEntries(["All", "Today", "Upcoming", "Overdue", "Completed", "Lost", "Converted"].map((name) =>
+    [name, followups.filter((f) => name === "All" || followupStatus(f) === name ||
+      (name === "Today" && followupStatus(f) === "Scheduled" && (!f.date || f.date === todayStr)) ||
+      (name === "Upcoming" && followupStatus(f) === "Scheduled" && f.date > todayStr)).length]));
   const rows = followups.filter((f) =>
     (tab === "All"
       ? true
-      : tab === "Completed"
-        ? f.completed
-        : !f.completed &&
-          (tab === "Today"
-            ? f.date === todayStr || !f.date
-            : tab === "Upcoming"
-              ? f.date > todayStr
-              : f.date < todayStr)) &&
+      : tab === "Today"
+        ? followupStatus(f) === "Scheduled" && (f.date === todayStr || !f.date)
+        : tab === "Upcoming"
+          ? followupStatus(f) === "Scheduled" && f.date > todayStr
+          : followupStatus(f) === tab) &&
     (!query || [f.name, f.phone, f.purpose, getNoteText(f.notes), leadNoteFor(f)]
       .some((value) => String(value || "").toLowerCase().includes(query))) &&
     (!assigned || (assigned === "Unassigned" ? !f.assigned : f.assigned === assigned)) &&
@@ -488,7 +492,7 @@ export function FollowupsPage({
   return (
     <section className="card followups-table-card">
       <div className="tabs">
-        {["All", "Today", "Upcoming", "Overdue", "Completed"].map((t) => (
+        {["All", "Today", "Upcoming", "Overdue", "Completed", "Lost", "Converted"].map((t) => (
           <button
             key={t}
             className={tab === t ? "active" : ""}
@@ -497,7 +501,7 @@ export function FollowupsPage({
               setPage(1);
             }}
           >
-            {t}
+            {t} <span className="followup-tab-count">{counts[t]}</span>
           </button>
         ))}
       </div>
@@ -618,7 +622,7 @@ export function FollowupsPage({
                 </button>}
                 {!readOnly && canWorkRecord(r) && (
                   <>
-                    <button
+                    {!["Lost", "Converted"].includes(followupStatus(r)) && <button
                       disabled={pendingId === r.id}
                       onClick={async (event) => {
                         event.stopPropagation();
@@ -628,8 +632,14 @@ export function FollowupsPage({
                       }}
                     >
                       {r.completed ? "Reopen" : "Complete"}
-                    </button>
-                    {!r.completed && (
+                    </button>}
+                    {!["Lost", "Converted"].includes(followupStatus(r)) && ["Lost", "Converted"].map((outcome) => (
+                      <button key={outcome} type="button" disabled={pendingId === r.id} onClick={async (event) => {
+                        event.stopPropagation(); setPendingId(r.id);
+                        try { await onOutcome(r, outcome); } finally { setPendingId(null); }
+                      }}>{outcome}</button>
+                    ))}
+                    {!r.completed && !["Lost", "Converted"].includes(followupStatus(r)) && (
                       <button onClick={(event) => {
                         event.stopPropagation();
                         openModal({ type: "followup", record: r });
@@ -690,11 +700,17 @@ export function FollowupsPage({
                   <button type="button" onClick={() => canWork
                     ? openModal({ type: "followup", record: followup })
                     : navigate("leads/" + followup.leadId)}>{canWork ? "Edit" : "View lead"}</button>
-                  {canWork && <button type="button" disabled={pendingId === followup.id} onClick={async () => {
+                  {canWork && !["Lost", "Converted"].includes(followupStatus(followup)) && <button type="button" disabled={pendingId === followup.id} onClick={async () => {
                     setPendingId(followup.id);
                     try { await onComplete(followup); }
                     finally { setPendingId(null); }
                   }}>{followup.completed ? "Reopen" : "Complete"}</button>}
+                  {canWork && !["Lost", "Converted"].includes(followupStatus(followup)) && ["Lost", "Converted"].map((outcome) => (
+                    <button key={outcome} type="button" disabled={pendingId === followup.id} onClick={async () => {
+                      setPendingId(followup.id);
+                      try { await onOutcome(followup, outcome); } finally { setPendingId(null); }
+                    }}>{outcome}</button>
+                  ))}
                   {canWork && <button type="button" className="danger-button" onClick={() => onDelete(followup)}>Delete</button>}
                 </div>
               </div>

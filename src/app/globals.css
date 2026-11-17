@@ -1279,6 +1279,12 @@ td small {
   border-bottom-color: var(--teal);
   color: var(--teal);
 }
+.followup-tab-count {
+  margin-left: 3px;
+  font-size: 10px;
+  color: inherit;
+  opacity: .8;
+}
 .row-actions {
   display: flex;
   gap: 5px;
