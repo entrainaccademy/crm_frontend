@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import CallNotePresets from "./CallNotePresets";
 
 function formatElapsed(seconds) {
   const safe = Math.max(0, Math.floor(seconds));
@@ -12,6 +13,7 @@ export default function DialResultForm({ attempt, saving, onStop, onSave, onDisc
   const [status, setStatus] = useState("");
   const [duration, setDuration] = useState("");
   const [durationEdited, setDurationEdited] = useState(false);
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     const update = () => setElapsed(Math.max(0, Math.floor(((attempt.endedAt || Date.now()) - attempt.startedAt) / 1000)));
@@ -36,7 +38,7 @@ export default function DialResultForm({ attempt, saving, onStop, onSave, onDisc
     const confirmedDuration = noConversation ? "00:00" : shownDuration.trim();
     if (!/^\d+:[0-5]\d$/.test(confirmedDuration)) return;
     if (!attempt.endedAt) return;
-    onSave({ status, duration: confirmedDuration });
+    onSave({ status, duration: confirmedDuration, notes });
   };
 
   return (
@@ -71,6 +73,12 @@ export default function DialResultForm({ attempt, saving, onStop, onSave, onDisc
           required
         />
       </label>
+      <label>
+        Call notes
+        <textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)}
+          placeholder="What did the customer say?" />
+      </label>
+      <CallNotePresets notes={notes} onChange={setNotes} />
       <div className="form-actions">
         <button type="button" onClick={onDiscard} disabled={saving}>Discard</button>
         <button type="submit" className="primary" disabled={saving || !status || !attempt.endedAt}>{saving ? "Saving…" : "Save duration"}</button>

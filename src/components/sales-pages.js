@@ -30,6 +30,7 @@ import {
 } from "./ui";
 import { statuses, sources, priorities, closedStatuses, calls, money, getNoteText, isCallToday } from "@/lib/data";
 import { AudioPlayer } from "./AudioPlayer";
+import CallNotePresets from "./CallNotePresets";
 const followupAssigneePalette = [
   ["#f8f5ff", "#f0eafd", "#9a82cc"],
   ["#f3f8ff", "#e9f2ff", "#6b9ed0"],
@@ -399,6 +400,7 @@ export function LeadDetails({ lead, openModal, onDialLead, notify, updateLead, n
             }
           }}>
             <textarea aria-label="Add note" placeholder="Add a note…" value={note} onChange={(e) => setNote(e.target.value)} required />
+            <CallNotePresets notes={note} onChange={setNote} />
             <button className="primary" type="submit">Add note</button>
           </form>}
         </div>

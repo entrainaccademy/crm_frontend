@@ -5123,6 +5123,34 @@ textarea {
   flex-direction: column;
   gap: 14px;
 }
+.call-note-presets {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+.call-note-presets > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.call-note-presets > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.call-note-presets button {
+  border: 1px solid #ccd8e4;
+  border-radius: 6px;
+  background: #fff;
+  color: #294761;
+  padding: 6px 9px;
+  font-size: 11px;
+}
+.call-note-presets button:disabled {
+  background: #e8f6ef;
+  border-color: #b8ddca;
+  color: #167757;
+  opacity: 1;
+}
 .call-modal-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;

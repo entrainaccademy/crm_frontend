@@ -40,6 +40,7 @@ import CourseCombobox from "./course-combobox";
 import { LeadPhoneField } from "./lead-phone-field";
 import { isPossiblePhoneNumber } from "react-phone-number-input";
 import DialResultForm from "./DialResultForm";
+import CallNotePresets from "./CallNotePresets";
 import CoursesPage from "./courses-page";
 import ProfileEditor from "./profile-editor";
 import {
@@ -458,6 +459,7 @@ function CallModalFields({
                     onChange={(e) => setNotes(e.target.value)}
                   />
                 </label>
+                <CallNotePresets notes={notes} onChange={setNotes} />
               </div>
 
               <div className="active-call-footer" style={{ marginTop: "14px" }}>
@@ -547,6 +549,7 @@ function CallModalFields({
                   onChange={(e) => setNotes(e.target.value)}
                 />
               </label>
+              <CallNotePresets notes={notes} onChange={setNotes} />
 
               {telephonyConfig?.isConfigured && (
                 <div style={{ marginTop: "14px" }}>
@@ -712,6 +715,7 @@ function CallModalFields({
               onChange={(e) => setNotes(e.target.value)}
             />
           </label>
+          <CallNotePresets notes={notes} onChange={setNotes} />
 
           {!isExistingLead && (
             <label style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", cursor: "pointer", fontSize: "13px", fontWeight: 500 }}>
@@ -1304,7 +1308,7 @@ export default function CRMApp() {
     setDialAttempt(stopped);
   }
 
-  async function saveDialDuration({ status, duration }) {
+  async function saveDialDuration({ status, duration, notes }) {
     if (!dialAttempt || dialSaving) return;
     setDialSaving(true);
     try {
@@ -1318,6 +1322,7 @@ export default function CRMApp() {
         direction: "Outgoing",
         callStatus: status,
         duration,
+        notes: notes.trim(),
         callDate: started.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
         callTime: started.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
       });
